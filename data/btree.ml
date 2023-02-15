@@ -20,6 +20,17 @@ module Make (V: Map.OrderedType) = struct
       max_children: int;
     }
 
+    let empty_node = {
+      n = 0;
+      keys = Finite_vector.init (); 
+      values = Finite_vector.init ();
+      leaf= true;
+      children= Finite_vector.init ();
+      no_elements= 0;
+      capacity=0;
+      min_child_capacity=0;
+    }
+
     let rec size_node node =
       if node.leaf
       then Finite_vector.length node.values
@@ -43,7 +54,7 @@ module Make (V: Map.OrderedType) = struct
              )
          else fun _fmt _vl -> ())
         (List.init (Finite_vector.length node.children) (fun i ->
-           ((if i < node.n then Some node.keys.!(i) else None), node.children.!(i))))
+             ((if i < node.n then Some node.keys.!(i) else None), node.children.!(i))))
 
     let pp_node_internal = pp_node
     let pp_node ?pp_v f fmt vl = pp_node ?pp_v 0 f fmt vl
@@ -93,9 +104,9 @@ module Make (V: Map.OrderedType) = struct
     let rec search_node x k =
       let index =
         find_int_range ~start:0 ~stop:(x.n - 1) (fun i ->
-          if V.compare k x.keys.!(i) <= 0
-          then Some i
-          else None)
+            if V.compare k x.keys.!(i) <= 0
+            then Some i
+            else None)
         |> Option.value ~default:x.n in
       if index < x.n && V.compare x.keys.!(index) k = 0
       then Some (x, index)
@@ -110,10 +121,10 @@ module Make (V: Map.OrderedType) = struct
 
     let min_capacity vec =
       Finite_vector.fold_left (fun acc vl ->
-        match acc with
-        | None -> Some vl.capacity
-        | Some vl' when vl' > vl.capacity -> Some vl.capacity
-        | _ -> acc) None vec
+          match acc with
+          | None -> Some vl.capacity
+          | Some vl' when vl' > vl.capacity -> Some vl.capacity
+          | _ -> acc) None vec
 
     (* pre: x.(i) has (2 * t - 1) keys *)
     let split_child x i =
@@ -153,8 +164,8 @@ module Make (V: Map.OrderedType) = struct
     let rec insert_node ~max_children x k vl =
       let index =
         find_int_range_dec ~start:(x.n - 1) ~stop:0 (fun i ->
-          if V.compare k x.keys.!(i) >= 0
-          then Some (i + 1) else None)
+            if V.compare k x.keys.!(i) >= 0
+            then Some (i + 1) else None)
         |> Option.value ~default:0 in
       x.no_elements <- x.no_elements + 1;
       if x.leaf
@@ -286,30 +297,75 @@ module Make (V: Map.OrderedType) = struct
   let rec build_node ~max_children:t ~h start stop arr =
     if h <= 1
     then Sequential.{
-      n = stop - start;
-      keys = Finite_vector.init_with ~capacity:(2 * t - 1) (stop - start) (fun i -> fst arr.(start + i));
-      values=Finite_vector.init_with ~capacity:(2 * t - 1) (stop - start) (fun i -> snd arr.(start + i));
-      leaf=true;
-      children = Finite_vector.init ~capacity:(2 * t) ();
-      no_elements=stop - start;
-      capacity=(2 * t - 1 - (stop - start));
-      min_child_capacity=0;
-    }
+        n = stop - start;
+        keys = Finite_vector.init_with ~capacity:(2 * t - 1) (stop - start) (fun i -> fst arr.(start + i));
+        values=Finite_vector.init_with ~capacity:(2 * t - 1) (stop - start) (fun i -> snd arr.(start + i));
+        leaf=true;
+        children = Finite_vector.init ~capacity:(2 * t) ();
+        no_elements=stop - start;
+        capacity=(2 * t - 1 - (stop - start));
+        min_child_capacity=0;
+      }
     else
       let key_inds, sub_ranges = partition_range ~t ~h (start,stop) in
 
       let children =
         let start = ref start in
         Array.map (fun stop ->
-          let subtree = build_node ~max_children:t ~h:(h - 1) !start stop arr in
-          start := (stop + 1);
-          subtree
-        ) sub_ranges in
+            let subtree = build_node ~max_children:t ~h:(h - 1) !start stop arr in
+            start := (stop + 1);
+            subtree
+          ) sub_ranges in
       let n = Array.length key_inds in
       let keys = Finite_vector.init_with ~capacity:(2 * t - 1) n (fun pos -> fst arr.(key_inds.(pos))) in
       let values = Finite_vector.init_with ~capacity:(2 * t - 1) n (fun pos -> snd arr.(key_inds.(pos))) in
       let children = Finite_vector.init_with ~capacity:(2 * t) (Array.length children)
-                       (fun pos -> children.(pos)) in
+          (fun pos -> children.(pos)) in
+      let min_child_capacity = Sequential.min_capacity children |> Option.value ~default:0 in
+      let capacity = (2 * t - 1 - n) * (min_child_capacity + 1) in
+      {
+        n;
+        keys;
+        values;
+        leaf=false;
+        children;
+        no_elements=stop - start;
+        capacity; min_child_capacity
+      }
+
+  let rec par_build_node pool ~max_children:t ~h start stop arr =
+    if h <= 1
+    then Sequential.{
+        n = stop - start;
+        keys = Finite_vector.init_with ~capacity:(2 * t - 1) (stop - start) (fun i -> fst arr.(start + i));
+        values=Finite_vector.init_with ~capacity:(2 * t - 1) (stop - start) (fun i -> snd arr.(start + i));
+        leaf=true;
+        children = Finite_vector.init ~capacity:(2 * t) ();
+        no_elements=stop - start;
+        capacity=(2 * t - 1 - (stop - start));
+        min_child_capacity=0;
+      }
+    else
+      let key_inds, sub_ranges = partition_range ~t ~h (start,stop) in
+
+      let children =
+        let start = ref start in
+        let sub_ranges = Array.map (fun stop -> 
+            let curr = !start, stop in
+            start := stop + 1;
+            curr
+          ) sub_ranges in
+        let child_arr = Array.make (Array.length sub_ranges) Sequential.empty_node in
+        Domainslib.Task.parallel_for pool ~start:0 ~finish:((Array.length sub_ranges) - 1) ~body:(fun i -> 
+            let start, stop = sub_ranges.(i) in
+            child_arr.(i) <- par_build_node pool ~max_children:t ~h:(h-1) start stop arr
+          ); child_arr
+      in
+      let n = Array.length key_inds in
+      let keys = Finite_vector.init_with ~capacity:(2 * t - 1) n (fun pos -> fst arr.(key_inds.(pos))) in
+      let values = Finite_vector.init_with ~capacity:(2 * t - 1) n (fun pos -> snd arr.(key_inds.(pos))) in
+      let children = Finite_vector.init_with ~capacity:(2 * t) (Array.length children)
+          (fun pos -> children.(pos)) in
       let min_child_capacity = Sequential.min_capacity children |> Option.value ~default:0 in
       let capacity = (2 * t - 1 - n) * (min_child_capacity + 1) + min_child_capacity in
       {
@@ -333,15 +389,15 @@ module Make (V: Map.OrderedType) = struct
         let children =
           let start = ref 0 in
           Array.map (fun stop ->
-            let subtree = build_node ~max_children:t ~h:(h - 1) !start stop arr in
-            start := stop + 1;
-            subtree
-          ) sub_ranges in
+              let subtree = build_node ~max_children:t ~h:(h - 1) !start stop arr in
+              start := stop + 1;
+              subtree
+            ) sub_ranges in
         let n = Array.length key_inds in
         let keys = Finite_vector.init_with ~capacity:(2 * t - 1) n (fun pos -> fst arr.(key_inds.(pos))) in
         let values = Finite_vector.init_with ~capacity:(2 * t - 1) n (fun pos -> snd arr.(key_inds.(pos))) in
         let children = Finite_vector.init_with ~capacity:(2 * t) (Array.length children)
-                         (fun pos -> children.(pos)) in
+            (fun pos -> children.(pos)) in
         let min_child_capacity = Sequential.min_capacity children |> Option.value ~default:0 in
         let capacity = (2 * t - 1 - n) * (min_child_capacity + 1) + min_child_capacity in
         { n; keys; values; leaf=false; children; no_elements=Array.length arr; min_child_capacity; capacity } in
@@ -358,9 +414,9 @@ module Make (V: Map.OrderedType) = struct
     (* if the no elements in the node are greater than the number of keys we're searching for, then just do normal search in parallel *)
     if node.no_elements > (rstop - rstart) && false then
       Domainslib.Task.parallel_for pool ~start:rstart ~finish:(rstop - 1) ~body:(fun i ->
-        let (k,ind) = keys.(i) in
-        results.(ind) <- Option.map (fun (node,i) -> node.Sequential.values.!(i)) (Sequential.search_node node k)
-      )
+          let (k,ind) = keys.(i) in
+          results.(ind) <- Option.map (fun (node,i) -> node.Sequential.values.!(i)) (Sequential.search_node node k)
+        )
     else begin
       let handle_equal_keys ki i =
         if i < node.n && fst keys.(ki) = node.keys.!(i) then
@@ -384,8 +440,8 @@ module Make (V: Map.OrderedType) = struct
         |> Array.of_list in
       if not node.leaf then
         Domainslib.Task.parallel_for pool ~start:0 ~finish:(Array.length children - 1) ~body:(fun i ->
-          par_search_node pool node.children.!(i) ~keys ~results ~range:children.(i)
-        );
+            par_search_node pool node.children.!(i) ~keys ~results ~range:children.(i)
+          );
     end
 
   let par_search ~pool (t: 'a t) ks =
@@ -543,15 +599,15 @@ module Make (V: Map.OrderedType) = struct
     let inserts : (V.t * a) list ref = ref [] in
     let start_size = t.root.no_elements in
     Array.iter (fun (elt: a wrapped_op) -> match elt with
-      | Mk (Insert (key,vl), kont) -> kont (); inserts := (key,vl) :: !inserts
-      | Mk (Search key, kont) -> searches := (key, kont) :: !searches
-      | Mk (Size,kont) -> kont start_size
-    ) ops;
+        | Mk (Insert (key,vl), kont) -> kont (); inserts := (key,vl) :: !inserts
+        | Mk (Search key, kont) -> searches := (key, kont) :: !searches
+        | Mk (Size,kont) -> kont start_size
+      ) ops;
     let searches = Array.of_list !searches in
     Domainslib.Task.parallel_for pool ~start:0 ~finish:(Array.length searches - 1) ~body:(fun i ->
-      let key, kont = searches.(i) in
-      kont (Sequential.search t key)
-    );
+        let key, kont = searches.(i) in
+        kont (Sequential.search t key)
+      );
     let inserts = Array.of_list !inserts in
     Array.sort (fun (k1,_) (k2,_) -> V.compare k1 k2) inserts;
     par_insert ~pool t inserts
