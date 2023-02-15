@@ -32,7 +32,7 @@ S_PRESET := 1_000_000
 S_INS := 1_000_000
 # Need to fix assertion error with search
 S_SEARCH := 0
-S_SIZE := 10
+S_SIZE := 0
 skiplist : skiplist.ml
 	printf "Skiplist-Sequential\n"
 	$(B) skiplist-sequential --init-count=$(S_PRESET) --count=$(S_INS) --no-searches=$(S_SEARCH) --no-size=$(S_SIZE) -i $(ITER) -w $(WARMUP)

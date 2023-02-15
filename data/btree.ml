@@ -20,7 +20,7 @@ module Make (V: Map.OrderedType) = struct
       max_children: int;
     }
 
-    let empty_node = {
+    (* let empty_node = {
       n = 0;
       keys = Finite_vector.init (); 
       values = Finite_vector.init ();
@@ -29,7 +29,7 @@ module Make (V: Map.OrderedType) = struct
       no_elements= 0;
       capacity=0;
       min_child_capacity=0;
-    }
+    } *)
 
     let rec size_node node =
       if node.leaf
@@ -333,7 +333,7 @@ module Make (V: Map.OrderedType) = struct
         capacity; min_child_capacity
       }
 
-  let rec par_build_node pool ~max_children:t ~h start stop arr =
+  (* let rec par_build_node pool ~max_children:t ~h start stop arr =
     if h <= 1
     then Sequential.{
         n = stop - start;
@@ -376,7 +376,7 @@ module Make (V: Map.OrderedType) = struct
         children;
         no_elements=stop - start;
         capacity; min_child_capacity
-      }
+      } *)
 
   let build_from_sorted ?max_children:(t=3) arr =
     let h = find_height ~t ~no_elts:(Array.length arr) in
