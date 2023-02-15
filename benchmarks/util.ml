@@ -1,7 +1,7 @@
 module IntSet = Set.Make(Int)
 
 let max_rdm_int = (Int.shift_left 1 30) - 1
-let gen_random_array ~min ~max count =
+let gen_random_uniqe_array ~min ~max count =
   match () with
   | _ when max - min < count -> failwith "if min < 0 then failwith "
   | _ when min < 0 -> failwith "min cannot be less than 0"
@@ -15,3 +15,12 @@ let gen_random_array ~min ~max count =
       then fresh_int s
       else (seen_ints := IntSet.add vl !seen_ints; vl) in
     Array.init count fresh_int
+
+let gen_random_array ~min ~max count =
+  match () with
+  | _ when max - min < count -> failwith "if min < 0 then failwith "
+  | _ when min < 0 -> failwith "min cannot be less than 0"
+  | _ when max > max_rdm_int ->  
+    let s = Format.sprintf "max cannot be greater than %d" max_rdm_int in failwith s
+  | _ -> ();
+    Array.init count (fun _ -> Random.int max_rdm_int)

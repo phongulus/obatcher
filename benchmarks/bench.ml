@@ -45,7 +45,7 @@ let () =
 let run_benchmark (type a) (module B: BENCHMARK with type spec_args = a)
     show_progress no_domains no_warmup no_iter 
     initial_count count min max (args: a) =
-  let num_domains = match no_domains with None -> Domain.recommended_domain_count () | Some d -> d in
+  let num_domains = match no_domains with None -> Domain.recommended_domain_count () - 1 | Some d -> d - 1 in
   let pool = Domainslib.Task.setup_pool ~num_domains () in
   let test = B.test_spec ~initial_count ~count ~min ~max args in
   Domainslib.Task.run pool (fun () ->

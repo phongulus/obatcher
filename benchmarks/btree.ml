@@ -21,9 +21,9 @@ let generic_spec_args: generic_spec_args Cmdliner.Term.t =
   Term.(const (fun sorted no_searches -> {sorted; no_searches=Option.value ~default:0 no_searches}) $ sorted $ no_searches)
 
 let generic_test_spec ~initial_count ~count ~min ~max spec_args =
-  let initial_elements () = Util.gen_random_array ~min ~max initial_count in
-  let insert_elements = Util.gen_random_array ~min ~max count in
-  let search_elements = Util.gen_random_array ~min ~max spec_args.no_searches in
+  let initial_elements () = Util.gen_random_uniqe_array ~min ~max initial_count in
+  let insert_elements = Util.gen_random_uniqe_array ~min ~max count in
+  let search_elements = Util.gen_random_uniqe_array ~min ~max spec_args.no_searches in
   if spec_args.sorted then
     Array.sort Int.compare insert_elements;
   { initial_elements; insert_elements; search_elements }
