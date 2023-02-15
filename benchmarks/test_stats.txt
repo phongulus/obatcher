@@ -38,3 +38,72 @@ Skiplist-Batched
 7.42117s ± 0.12552s
 7.38424s ± 0.13865s
 7.53834s ± 0.89054s
+
+
+Thu Feb 16 02:49:10 +08 2023
+machdep.cpu.cores_per_package: 8
+machdep.cpu.core_count: 8
+machdep.cpu.logical_per_package: 8
+machdep.cpu.thread_count: 8
+machdep.cpu.brand_string: Apple M1
+TESTPARAMS -- Warmup = 2, Iterations = 2
+Counter-Sequential
+0.02056s ± 0.00001s
+Counter-Coarse-Grained
+0.23965s ± 0.00067s
+0.52564s ± 0.00291s
+1.19647s ± 0.00153s
+0.55666s ± 0.00182s
+0.79954s ± 0.00027s
+0.93699s ± 0.04346s
+0.97638s ± 0.01790s
+0.99056s ± 0.01654s
+Counter-Batched
+0.85048s ± 0.00243s
+3.23773s ± 0.07591s
+2.62223s ± 0.01300s
+2.41960s ± 0.00809s
+2.75639s ± 0.05062s
+3.26424s ± 0.01195s
+3.49449s ± 0.01927s
+3.87819s ± 0.18383s
+Skiplist-Sequential
+3.22791s ± 0.01470s
+Skiplist-Coarse-Grained
+3.17270s ± 0.02828s
+3.30754s ± 0.04230s
+3.56486s ± 0.04485s
+3.73957s ± 0.00484s
+4.16231s ± 0.04060s
+4.19263s ± 0.02363s
+4.34148s ± 0.04608s
+4.20887s ± 0.04932s
+Skiplist-Batched
+3.95272s ± 0.40510s
+3.02681s ± 0.00177s
+2.33779s ± 0.06562s
+1.99734s ± 0.08740s
+2.28158s ± 0.17968s
+2.32527s ± 0.31876s
+2.37104s ± 0.02761s
+2.48137s ± 0.00542s
+Btree-Sequential
+0.75381s ± 0.03449s
+Btree-Coarse-Grained
+0.75375s ± 0.05035s
+1.31050s ± 0.01171s
+1.74177s ± 0.00417s
+1.88344s ± 0.00332s
+1.85805s ± 0.00673s
+1.83931s ± 0.00826s
+1.80836s ± 0.01260s
+1.79873s ± 0.00199s
+Btree-Batched
+0.85162s ± 0.02998s
+0.87336s ± 0.02140s
+0.89834s ± 0.01370s
+0.92710s ± 0.01250s
+1.25335s ± 0.00407s
+1.51440s ± 0.01273s
+1.76723s ± 0.04390s
+1.91818s ± 0.01020s

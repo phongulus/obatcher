@@ -1,7 +1,10 @@
 B := ../_build/default/benchmarks/bench.exe
 WARMUP := 2
 ITER := 2
-bench : counter skiplist btree
+bench : test_params counter skiplist btree
+
+test_params :
+	printf "TESTPARAMS -- Warmup = %d, Iterations = %d\n" $(WARMUP) $(ITER)
 
 C_OPS := 10_000_000
 counter : counter.ml
