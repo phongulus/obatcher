@@ -1,2 +1,2 @@
 #!/bin/bash
-make btree -s > ./test_stats.txt
+make -s > ./test_stats.txt
