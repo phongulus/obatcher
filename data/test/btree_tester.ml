@@ -65,7 +65,7 @@ let () =
       | domains_count :: _ -> int_of_string domains_count
     [@@alert "-unstable"] in
     let pool = Domainslib.Task.setup_pool ~num_domains:num_domains () in
-    let btree = Btree.build_from_sorted ~max_children keys_vals in
+    let btree = Btree.Sequential.{root=Btree.build_from_sorted ~pool ~max_children keys_vals; max_children} in
     dump_btree fname btree;
     print_btree btree;
     Domainslib.Task.teardown_pool pool
