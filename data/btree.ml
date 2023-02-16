@@ -262,7 +262,7 @@ module Make (V: Map.OrderedType) = struct
     let rec loop min_size max_size t =
       assert (t <= max_t);
       let elt_size = Int.div (r - t + 1) t in
-      let rem_size = Int.rem (r - t + 1) elt_size in
+      let rem_size = Int.rem (r - t + 1) t in
       if min_size <= elt_size && elt_size <= max_size &&
          (rem_size = 0 || elt_size + 1 <= max_size)
       then (t, elt_size, rem_size)
@@ -282,6 +282,7 @@ module Make (V: Map.OrderedType) = struct
         key_inds.(i) <- !start + sub_range_size + rem_comp;
       start := !start + sub_range_size + rem_comp + 1;
     done;
+    child_inds.(t - 1) <- stop;
     key_inds, child_inds
 
   let rec build_node ~max_children:t ~h start stop arr =
@@ -338,33 +339,29 @@ module Make (V: Map.OrderedType) = struct
     else
       let key_inds, sub_ranges = partition_range ~t ~h (start,stop) in
 
-      let children =
+      let sub_ranges =
         let start = ref start in
-        let sub_ranges = Array.map (fun stop -> 
-            let curr = !start, stop in
-            start := stop + 1;
-            curr
-          ) sub_ranges in
+        Array.map (fun stop -> 
+          let interval = !start, stop in
+          start := (stop + 1);
+          interval
+        ) sub_ranges in
+      let children =
         let child_arr = Array.make (Array.length sub_ranges) Sequential.{
-            n=0;
-            children=Finite_vector.init ();
-            keys=Finite_vector.init ();
-            values=Finite_vector.init ();
-            leaf=true;
-            no_elements=0;
-            capacity=0;
-            min_child_capacity=0;
-          } in
+          n=0; children=Finite_vector.init (); keys=Finite_vector.init (); values=Finite_vector.init (); leaf=true;
+          no_elements=0; capacity=0; min_child_capacity=0;
+        } in
         Domainslib.Task.parallel_for pool ~start:0 ~finish:((Array.length sub_ranges) - 1) ~body:(fun i -> 
-            let start, stop = sub_ranges.(i) in
-            child_arr.(i) <- par_build_node pool ~max_children:t ~h:(h-1) start stop arr
-          ); child_arr
+          let start, stop = sub_ranges.(i) in
+          child_arr.(i) <- par_build_node pool ~max_children:t ~h:(h-1) start stop arr
+        );
+        child_arr
       in
       let n = Array.length key_inds in
       let keys = Finite_vector.init_with ~capacity:(2 * t - 1) n (fun pos -> fst arr.(key_inds.(pos))) in
       let values = Finite_vector.init_with ~capacity:(2 * t - 1) n (fun pos -> snd arr.(key_inds.(pos))) in
       let children = Finite_vector.init_with ~capacity:(2 * t) (Array.length children)
-          (fun pos -> children.(pos)) in
+                       (fun pos -> children.(pos)) in
       let min_child_capacity = Sequential.min_capacity children |> Option.value ~default:0 in
       let capacity = (2 * t - 1 - n) * (min_child_capacity + 1) + min_child_capacity in
       {
@@ -645,9 +642,7 @@ module Make (V: Map.OrderedType) = struct
   let par_insert ~pool t batch =
     if (Array.length batch > t.Sequential.root.no_elements)
     then begin
-      (*  Printf.printf "Here\n%!"; *)
       t.Sequential.root <- par_rebuild ~pool ~max_children:t.Sequential.max_children t.root batch;
-      (* Printf.printf "FinishedHere\n%!";*)
     end
     else par_insert ~pool t batch 0 (Array.length batch)
 
