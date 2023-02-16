@@ -571,8 +571,17 @@ module Make (V: Map.OrderedType) = struct
             (* update no splits: new child may also be over capacity *)
             if t.children.!(!current_sub_interval + 1).capacity < sub_interval_size (!current_sub_interval + 1) then
               incr no_splits
+          end else if t.children.!(!current_sub_interval).capacity > 0 then begin
+            let to_insert = t.children.!(!current_sub_interval).capacity in
+            let min_capacity =
+              par_insert_node ~threshold ~pool ~max_children
+                t.children.!(!current_sub_interval) batch
+                start (start + to_insert) in
+            Finite_vector.set sub_intervals !current_sub_interval (start + to_insert, stop);
+            t.min_child_capacity <- min min_capacity t.min_child_capacity;
+            t.capacity <-
+              (2 * max_children - 1 - t.n) * (t.min_child_capacity + 1)  + t.min_child_capacity
           end else begin
-
             let (key,vl) = batch.(start) in
             (* otherwise, just insert the current element *)
             let min_capacity =
