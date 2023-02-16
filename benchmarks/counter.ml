@@ -55,6 +55,9 @@ module Sequential = struct
     for _ = 1 to test_spec.gets do
       ignore @@ Counter.get t
     done
+
+  let cleanup (_t: t) (_test_spec: test_spec) = ()
+
 end
 
 
@@ -88,6 +91,9 @@ module CoarseGrained = struct
               else Counter.get t.counter |> ignore
             )
         )
+
+  let cleanup (_t: t) (_test_spec: test_spec) = ()
+
 end
 
 module Batched = struct
@@ -116,6 +122,8 @@ module Batched = struct
           then BatchedCounter.apply counter Decr
           else BatchedCounter.apply counter Get |> ignore
         )
+
+  let cleanup (_t: t) (_test_spec: test_spec) = ()
 
 end
 

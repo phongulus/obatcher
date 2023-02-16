@@ -36,7 +36,7 @@ let generic_spec_args: generic_spec_args Cmdliner.Term.t =
       no_searches=Option.value ~default:0 no_searches;
       no_size=Option.value ~default:0 no_size;
       initial_count=Option.value ~default:1_000 initial_count;
-      min=Option.value ~default:(-10_000_000) min;
+      min=Option.value ~default:0 min;
       max=Option.value ~default:((Int.shift_left 1 30) - 1) max;
     }) $ sorted $ no_searches $ no_size $ initial_count $ min $ max)
 
@@ -77,6 +77,9 @@ module Sequential = struct
     for _ = 1 to test_spec.size do
       IntSkiplist.Sequential.size t |> ignore
     done
+
+  let cleanup (_t: t) (_test_spec: test_spec) = ()
+
 end
 
 
@@ -117,6 +120,9 @@ module CoarseGrained = struct
                 ignore (IntSkiplist.Sequential.size t.skiplist)
             )
         )
+
+  let cleanup (_t: t) (_test_spec: test_spec) = ()
+
 end
 
 module Batched = struct
@@ -151,6 +157,8 @@ module Batched = struct
           else
             ignore (BatchedSkiplist.apply t Size)
         )
+
+  let cleanup (_t: t) (_test_spec: test_spec) = ()
 
 end
 

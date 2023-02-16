@@ -27,6 +27,9 @@ module type BENCHMARK = sig
   (** [run pool t test] runs the test [test] on the data structure
       [t], using [pool] to schedule parallel tasks. *)
 
+  val cleanup: t -> test_spec -> unit
+  (** [cleanup t] will clean up any resources used by the data structure, performing consistency checks if needed *)
+
 end
 
 let benchmarks: (string, (module BENCHMARK)) Hashtbl.t = Hashtbl.create 32
@@ -48,10 +51,12 @@ let run_benchmark (type a) (module B: BENCHMARK with type spec_args = a)
   let pool = Domainslib.Task.setup_pool ~num_domains () in
   let test = B.test_spec ~count args in
   Domainslib.Task.run pool (fun () ->
-      Timing.time ~show_progress ~no_warmup ~no_iter ~init:(fun () -> B.init pool test ) (fun t ->
+      Timing.time ~show_progress ~no_warmup ~no_iter ~init:(fun () -> B.init pool test) ~cleanup:(fun t -> B.cleanup t test)
+        (fun t ->
           B.run pool t test
         )
     )
+
 
 
 let () =

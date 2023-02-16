@@ -1,7 +1,7 @@
 module IntSet = Set.Make(Int)
 
 let max_rdm_int = (Int.shift_left 1 30) - 1
-let gen_random_uniqe_array ~min ~max count =
+let gen_random_unique_array ~min ~max count =
   match () with
   | _ when max - min < count -> failwith "if min < 0 then failwith "
   | _ when min < 0 -> failwith "min cannot be less than 0"

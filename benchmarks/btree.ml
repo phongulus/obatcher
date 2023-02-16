@@ -2,19 +2,23 @@ module IntSet = Set.Make(Int)
 module IntBtree = Data.Btree.Make(Int)
 module BatchedIntBtree = Domainslib.Batcher.Make1(IntBtree)
 
-type generic_test_spec = {
-  initial_elements: (unit -> int array);
-  insert_elements: int array;
-  search_elements: int array;
-}
-
 type generic_spec_args = {
   sorted: bool;
   no_searches: int;
   min: int;
   max: int;
   initial_count: int;
+  should_validate: bool;
 }
+
+type generic_test_spec = {
+  args: generic_spec_args;
+  count: int;
+  mutable initial_elements: int array;
+  mutable insert_elements: int array;
+  mutable search_elements: int array;
+}
+
 
 let generic_spec_args: generic_spec_args Cmdliner.Term.t =
   let open Cmdliner in
@@ -27,23 +31,42 @@ let generic_spec_args: generic_spec_args Cmdliner.Term.t =
     Arg.(value @@ opt (some int) None @@ info ~doc:"Minimum value of data for random inputs" ["min"]) in
   let max =
     Arg.(value @@ opt (some int) None @@ info ~doc:"Maximum value of data for random inputs" ["max"]) in
+  let validate =
+    Arg.(value @@ flag @@ info ~doc:"Whether the tests should validate the results of the benchmarks" ["T"]) in
 
-  Term.(const (fun sorted no_searches min max initial_count  -> {
+  Term.(const (fun sorted no_searches min max initial_count validate -> {
       sorted;
       no_searches=Option.value ~default:0 no_searches;
       initial_count=Option.value ~default:1_000 initial_count;
-      min=Option.value ~default:(-10_000_000) min;
+      min=Option.value ~default:0 min;
       max=Option.value ~default:((Int.shift_left 1 30) - 1) max;
-    }) $ sorted $ no_searches $ min $ max $ initial_count)
+      should_validate=validate
+    }) $ sorted $ no_searches $ min $ max $ initial_count $ validate)
 
 let generic_test_spec ~count spec_args =
-  let min, max =  spec_args.min, spec_args.max in
-  let initial_elements () = Util.gen_random_uniqe_array ~min ~max spec_args.initial_count in
-  let insert_elements = Util.gen_random_uniqe_array ~min ~max count in
-  let search_elements = Util.gen_random_uniqe_array ~min ~max spec_args.no_searches in
-  if spec_args.sorted then
+  { args=spec_args; count: int; insert_elements=[| |]; search_elements=[| |]; initial_elements=[| |] }
+
+let generic_init test_spec f =
+  let min, max =  test_spec.args.min, test_spec.args.max in
+  let elements = Util.gen_random_unique_array ~min ~max (test_spec.args.initial_count + test_spec.count) in
+  let initial_elements = Array.make test_spec.args.initial_count min in
+  let insert_elements = Array.make test_spec.count min in
+  let search_elements = Util.gen_random_unique_array ~min ~max test_spec.args.no_searches in
+  Array.blit
+    elements 0
+    initial_elements 0
+    test_spec.args.initial_count;
+  Array.blit
+    elements test_spec.args.initial_count
+    insert_elements 0
+    test_spec.count;
+
+  if test_spec.args.sorted then
     Array.sort Int.compare insert_elements;
-  { initial_elements; insert_elements; search_elements }
+  test_spec.insert_elements <- insert_elements;
+  test_spec.initial_elements <- initial_elements;
+  test_spec.search_elements <- search_elements;
+  f initial_elements
 
 module Sequential = struct
 
@@ -59,10 +82,13 @@ module Sequential = struct
     generic_test_spec ~count spec_args
 
   let init _pool test_spec =
-    let tree = IntBtree.Sequential.init ~max_children:4 () in
-    Array.iter (fun i -> IntBtree.Sequential.insert tree i ())
-      (test_spec.initial_elements ());
-    tree
+    generic_init test_spec (fun initial_elements ->
+      let tree = IntBtree.Sequential.init ~max_children:4 () in
+      Array.iter (fun i -> IntBtree.Sequential.insert tree i ())
+        initial_elements;
+      tree
+    )
+
 
   let run _pool t test_spec =
     Array.iter (fun i ->
@@ -70,8 +96,17 @@ module Sequential = struct
       ) test_spec.insert_elements;
     Array.iter (fun i ->
         ignore @@ IntBtree.Sequential.search t i
-      ) test_spec.search_elements;
+      ) test_spec.search_elements
 
+  let cleanup (t: t) (test_spec: test_spec) =
+    if test_spec.args.should_validate then begin
+      Array.iter (fun elt ->
+        match IntBtree.Sequential.search t elt with
+        | Some _ -> ()
+        | None -> Format.ksprintf failwith "Could not find inserted element %d in tree" elt
+      ) test_spec.insert_elements
+    end
+    
 end
 
 
@@ -89,11 +124,13 @@ module CoarseGrained = struct
     generic_test_spec ~count spec_args
 
   let init _pool test_spec =
-    let tree = IntBtree.Sequential.init ~max_children:4 () in
-    Array.iter (fun i -> IntBtree.Sequential.insert tree i ())
-      (test_spec.initial_elements ());
-    let mutex = Mutex.create () in
-    {tree;mutex}
+    generic_init test_spec (fun initial_elements ->
+      let tree = IntBtree.Sequential.init ~max_children:4 () in
+      Array.iter (fun i -> IntBtree.Sequential.insert tree i ())
+        initial_elements;
+      let mutex = Mutex.create () in
+      {tree;mutex}
+    )
 
   let run pool (t: t) test_spec =
     Domainslib.Task.parallel_for pool ~chunk_size:1
@@ -107,6 +144,15 @@ module CoarseGrained = struct
                              test_spec.search_elements.(i - Array.length test_spec.search_elements))
             )
         )
+
+  let cleanup (t: t) (test_spec: test_spec) =
+    if test_spec.args.should_validate then begin
+      Array.iter (fun elt ->
+        match IntBtree.Sequential.search t.tree elt with
+        | Some _ -> ()
+        | None -> Format.ksprintf failwith "Could not find inserted element %d in tree" elt
+      ) test_spec.insert_elements
+    end
 
 end
 
@@ -125,22 +171,48 @@ module Batched = struct
     generic_test_spec ~count spec_args
 
   let init pool test_spec =
-    let tree = BatchedIntBtree.init pool in
-    Domainslib.Task.run pool (fun () ->
-        Array.iter (fun i -> BatchedIntBtree.apply tree (Insert (i, ())))
-          (test_spec.initial_elements ());
-      );
-    tree
+    generic_init test_spec (fun initial_elements ->
+      let tree = BatchedIntBtree.init pool in
+      Array.iter (fun i -> BatchedIntBtree.apply tree (Insert (i, ())))
+        initial_elements;
+      tree)
 
   let run pool (tree: t) test_spec =
     Domainslib.Task.parallel_for pool ~chunk_size:1
       ~start:0 ~finish:(Array.length test_spec.insert_elements + Array.length test_spec.search_elements - 1)
       ~body:(fun i ->
-          if i < Array.length test_spec.insert_elements
-          then BatchedIntBtree.apply tree (Insert (test_spec.insert_elements.(i), ()))
-          else 
-            ignore (BatchedIntBtree.apply tree (Search test_spec.search_elements.(i - Array.length test_spec.insert_elements)))
-        )
+        if i < Array.length test_spec.insert_elements
+        then BatchedIntBtree.apply tree (Insert (test_spec.insert_elements.(i), ()))
+        else 
+          ignore (BatchedIntBtree.apply tree (Search test_spec.search_elements.(i - Array.length test_spec.insert_elements)))
+      )
+
+  let cleanup (t: t) (test_spec: test_spec) =
+    let t = BatchedIntBtree.unsafe_get_internal_data t in
+    if test_spec.args.should_validate then begin
+      if t.IntBtree.Sequential.root.no_elements <> Array.length test_spec.insert_elements + Array.length test_spec.initial_elements
+      then Format.ksprintf failwith "Inserted %d elements, but found only %d in the tree"
+             (Array.length test_spec.insert_elements + Array.length test_spec.initial_elements)
+             t.IntBtree.Sequential.root.no_elements;
+      let btree_flattened = IntBtree.flatten t.root |> Array.of_seq in
+      let all_elements = Array.concat [test_spec.insert_elements; test_spec.initial_elements] in
+      Array.sort Int.compare all_elements;
+      if Array.length btree_flattened <> Array.length all_elements then
+        Format.ksprintf failwith "length of flattened btree (%d) did not match inserts (%d) (no_elements=%d)"
+          (Array.length btree_flattened) (Array.length all_elements) (t.root.no_elements);
+
+      for i = 0 to Array.length btree_flattened - 1 do
+        if fst btree_flattened.(i) <> all_elements.(i) then
+          Format.ksprintf failwith "element %d of the btree was expected to be %d, but got %d" i
+            all_elements.(i) (fst btree_flattened.(i));
+      done;
+
+      Array.iter (fun elt ->
+        match IntBtree.Sequential.search t elt with
+        | Some _ -> ()
+        | None -> Format.ksprintf failwith "Could not find inserted element %d in tree" elt
+      ) test_spec.insert_elements;
+    end;
 
 end
 
