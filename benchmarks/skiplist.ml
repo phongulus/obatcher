@@ -11,7 +11,10 @@ type generic_test_spec = {
 type generic_spec_args = {
   sorted : bool;
   no_searches : int;
-  no_size : int
+  no_size : int;
+  initial_count: int;
+  min: int;
+  max: int;
 }
 
 let generic_spec_args: generic_spec_args Cmdliner.Term.t =
@@ -21,9 +24,24 @@ let generic_spec_args: generic_spec_args Cmdliner.Term.t =
     Arg.(value @@ opt (some int) None @@ info ~doc:"number of searches" ~docv:"NO_SEARCHES" ["n"; "no-searches"]) in
   let no_size = 
     Arg.(value @@ opt (some int) None @@ info ~doc:"number of size operation calls" ~docv:"NO_SIZE" ["n_sz"; "no-size"]) in
-  Term.(const (fun sorted no_searches no_size -> {sorted; no_searches=Option.value ~default:0 no_searches; no_size=Option.value ~default:0 no_size}) $ sorted $ no_searches $ no_size)
+  let initial_count =
+    Arg.(value @@ opt (some int) None @@ info ~doc:"Initial number of operations" ["init-count"]) in
+  let min =
+    Arg.(value @@ opt (some int) None @@ info ~doc:"Minimum value of data for random inputs" ["min"]) in
+  let max =
+    Arg.(value @@ opt (some int) None @@ info ~doc:"Maximum value of data for random inputs" ["max"]) in
+  Term.(const (fun sorted no_searches no_size initial_count min max ->
+    {
+      sorted;
+      no_searches=Option.value ~default:0 no_searches;
+      no_size=Option.value ~default:0 no_size;
+      initial_count=Option.value ~default:1_000 initial_count;
+      min=Option.value ~default:(-10_000_000) min;
+      max=Option.value ~default:((Int.shift_left 1 30) - 1) max;
+    }) $ sorted $ no_searches $ no_size $ initial_count $ min $ max)
 
-let generic_test_spec ~initial_count ~count ~min ~max spec_args =
+let generic_test_spec ~count spec_args =
+  let {min;max;initial_count;_} = spec_args in
   let initial_elements () = Util.gen_random_array ~min ~max initial_count in
   let insert_elements = Util.gen_random_array ~min ~max count in
   let search_elements = Util.gen_random_array ~min ~max spec_args.no_searches in
@@ -41,8 +59,8 @@ module Sequential = struct
 
   let spec_args: spec_args Cmdliner.Term.t = generic_spec_args
 
-  let test_spec ~initial_count ~count ~min ~max spec_args =
-    generic_test_spec ~initial_count ~count ~min ~max spec_args
+  let test_spec ~count spec_args =
+    generic_test_spec ~count spec_args
 
   let init _pool test_spec = 
     let initial_elements = test_spec.initial_elements () in
@@ -73,8 +91,8 @@ module CoarseGrained = struct
 
   let spec_args: spec_args Cmdliner.Term.t = generic_spec_args
 
-  let test_spec ~initial_count ~count ~min ~max spec_args =
-    generic_test_spec ~initial_count ~count ~min ~max spec_args
+  let test_spec ~count spec_args =
+    generic_test_spec ~count spec_args
 
   let init _pool test_spec = 
     let initial_elements = test_spec.initial_elements () in
@@ -111,8 +129,8 @@ module Batched = struct
 
   let spec_args: spec_args Cmdliner.Term.t = generic_spec_args
 
-  let test_spec ~initial_count ~count ~min ~max spec_args =
-    generic_test_spec ~initial_count ~count ~min ~max spec_args
+  let test_spec ~count spec_args =
+    generic_test_spec ~count spec_args
 
   let init pool test_spec = 
     let initial_elements = test_spec.initial_elements () in

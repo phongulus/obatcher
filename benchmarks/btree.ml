@@ -11,6 +11,9 @@ type generic_test_spec = {
 type generic_spec_args = {
   sorted: bool;
   no_searches: int;
+  min: int;
+  max: int;
+  initial_count: int;
 }
 
 let generic_spec_args: generic_spec_args Cmdliner.Term.t =
@@ -18,10 +21,24 @@ let generic_spec_args: generic_spec_args Cmdliner.Term.t =
   let sorted = Arg.(value @@ flag  @@ info ~doc:"whether the inserts should be sorted" ["s"; "sorted"]) in
   let no_searches =
     Arg.(value @@ opt (some int) None @@ info ~doc:"number of searches" ~docv:"NO_SEARCHES" ["n"; "no-searches"]) in
-  Term.(const (fun sorted no_searches -> {sorted; no_searches=Option.value ~default:0 no_searches}) $ sorted $ no_searches)
+  let initial_count =
+    Arg.(value @@ opt (some int) None @@ info ~doc:"Initial number of operations" ["init-count"]) in
+  let min =
+    Arg.(value @@ opt (some int) None @@ info ~doc:"Minimum value of data for random inputs" ["min"]) in
+  let max =
+    Arg.(value @@ opt (some int) None @@ info ~doc:"Maximum value of data for random inputs" ["max"]) in
 
-let generic_test_spec ~initial_count ~count ~min ~max spec_args =
-  let initial_elements () = Util.gen_random_uniqe_array ~min ~max initial_count in
+  Term.(const (fun sorted no_searches min max initial_count  -> {
+      sorted;
+      no_searches=Option.value ~default:0 no_searches;
+      initial_count=Option.value ~default:1_000 initial_count;
+      min=Option.value ~default:(-10_000_000) min;
+      max=Option.value ~default:((Int.shift_left 1 30) - 1) max;
+    }) $ sorted $ no_searches $ min $ max $ initial_count)
+
+let generic_test_spec ~count spec_args =
+  let min, max =  spec_args.min, spec_args.max in
+  let initial_elements () = Util.gen_random_uniqe_array ~min ~max spec_args.initial_count in
   let insert_elements = Util.gen_random_uniqe_array ~min ~max count in
   let search_elements = Util.gen_random_uniqe_array ~min ~max spec_args.no_searches in
   if spec_args.sorted then
@@ -38,8 +55,8 @@ module Sequential = struct
 
   let spec_args: spec_args Cmdliner.Term.t = generic_spec_args
 
-  let test_spec ~initial_count ~count ~min ~max spec_args =
-    generic_test_spec ~initial_count ~count ~min ~max spec_args
+  let test_spec ~count spec_args =
+    generic_test_spec ~count spec_args
 
   let init _pool test_spec =
     let tree = IntBtree.Sequential.init ~max_children:4 () in
@@ -68,8 +85,8 @@ module CoarseGrained = struct
 
   let spec_args: spec_args Cmdliner.Term.t = generic_spec_args
 
-  let test_spec ~initial_count ~count ~min ~max spec_args =
-    generic_test_spec ~initial_count ~count ~min ~max spec_args
+  let test_spec ~count spec_args =
+    generic_test_spec ~count spec_args
 
   let init _pool test_spec =
     let tree = IntBtree.Sequential.init ~max_children:4 () in
@@ -104,8 +121,8 @@ module Batched = struct
 
   let spec_args: spec_args Cmdliner.Term.t = generic_spec_args
 
-  let test_spec ~initial_count ~count ~min ~max spec_args =
-    generic_test_spec ~initial_count ~count ~min ~max spec_args
+  let test_spec ~count spec_args =
+    generic_test_spec ~count spec_args
 
   let init pool test_spec =
     let tree = BatchedIntBtree.init pool in

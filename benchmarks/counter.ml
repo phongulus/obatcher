@@ -41,8 +41,7 @@ module Sequential = struct
 
   let spec_args: spec_args Cmdliner.Term.t = generic_spec_args
 
-  let test_spec ~initial_count ~count ~min ~max spec_args =
-    let _, _ , _ = initial_count, min, max in
+  let test_spec ~count spec_args =
     generic_test_spec ~count spec_args
 
   let init _pool _test_spec = Counter.init ()
@@ -69,8 +68,7 @@ module CoarseGrained = struct
 
   let spec_args: spec_args Cmdliner.Term.t = generic_spec_args
 
-  let test_spec ~initial_count ~count ~min ~max spec_args =
-    let _, _ , _ = initial_count, min, max in
+  let test_spec ~count spec_args =
     generic_test_spec ~count spec_args
 
   let init _pool _test_spec = 
@@ -102,8 +100,7 @@ module Batched = struct
 
   let spec_args: spec_args Cmdliner.Term.t = generic_spec_args
 
-  let test_spec ~initial_count ~count ~min ~max spec_args =
-    let _, _ , _ = initial_count, min, max in
+  let test_spec ~count spec_args =
     generic_test_spec ~count spec_args
 
   let init pool _test_spec = BatchedCounter.init pool

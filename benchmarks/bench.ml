@@ -16,7 +16,7 @@ module type BENCHMARK = sig
 
   val spec_args: spec_args Cmdliner.Term.t
 
-  val test_spec: initial_count:int -> count:int -> min:int -> max:int -> spec_args -> test_spec
+  val test_spec: count:int -> spec_args -> test_spec
   (** [test_spec ~initial_count ~count ~min ~max] constructs a test for data structure t  *)
 
   val init: Domainslib.Task.pool -> test_spec -> t
@@ -43,11 +43,10 @@ let () =
   Hashtbl.add benchmarks "skiplist-batched" (module Skiplist.Batched)
 
 let run_benchmark (type a) (module B: BENCHMARK with type spec_args = a)
-    show_progress no_domains no_warmup no_iter 
-    initial_count count min max (args: a) =
+    show_progress no_domains no_warmup no_iter count (args: a) =
   let num_domains = match no_domains with None -> Domain.recommended_domain_count () - 1 | Some d -> d - 1 in
   let pool = Domainslib.Task.setup_pool ~num_domains () in
-  let test = B.test_spec ~initial_count ~count ~min ~max args in
+  let test = B.test_spec ~count args in
   Domainslib.Task.run pool (fun () ->
       Timing.time ~show_progress ~no_warmup ~no_iter ~init:(fun () -> B.init pool test ) (fun t ->
           B.run pool t test
@@ -67,14 +66,8 @@ let () =
     Arg.(value @@ opt int 10 @@ info ~doc:"Number of warmup iterations to run" ["w"; "no-warmup"]) in
   let no_iter =
     Arg.(required @@ opt (some int) None @@ info ~doc:"Number of iterations to run" ["i"; "no-iter"]) in
-  let initial_count =
-    Arg.(value @@ opt int 0 @@ info ~doc:"Initial number of operations" ["init-count"]) in
   let count =
     Arg.(required @@ opt (some int) None @@ info ~doc:"Number of operations to run" ["c"; "count"]) in
-  let min =
-    Arg.(value @@ opt int 0 @@ info ~doc:"Minimum value of data for random inputs" ["min"]) in
-  let max =
-    Arg.(value @@ opt int ((Int.shift_left 1 30) - 1) @@ info ~doc:"Maximum value of data for random inputs" ["max"]) in
 
   let sub_cmds =
     Hashtbl.to_seq benchmarks
@@ -84,8 +77,7 @@ let () =
         let action =
           Term.(const (run_benchmark b)
                 $ show_progress $ no_domains $ no_warmup
-                $ no_iter $ initial_count $ count $ min $ max
-                $  B.spec_args) in
+                $ no_iter $ count $  B.spec_args) in
         Cmd.v info action
       )
     |> List.of_seq in
