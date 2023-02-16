@@ -42,7 +42,7 @@ module Sequential = struct
     generic_test_spec ~initial_count ~count ~min ~max spec_args
 
   let init _pool test_spec =
-    let tree = IntBtree.Sequential.init ~max_children:8 () in
+    let tree = IntBtree.Sequential.init ~max_children:4 () in
     Array.iter (fun i -> IntBtree.Sequential.insert tree i ())
       (test_spec.initial_elements ());
     tree
@@ -72,14 +72,14 @@ module CoarseGrained = struct
     generic_test_spec ~initial_count ~count ~min ~max spec_args
 
   let init _pool test_spec =
-    let tree = IntBtree.Sequential.init ~max_children:8 () in
+    let tree = IntBtree.Sequential.init ~max_children:4 () in
     Array.iter (fun i -> IntBtree.Sequential.insert tree i ())
       (test_spec.initial_elements ());
     let mutex = Mutex.create () in
     {tree;mutex}
 
   let run pool (t: t) test_spec =
-    Domainslib.Task.parallel_for pool
+    Domainslib.Task.parallel_for pool ~chunk_size:1
       ~start:0 ~finish:(Array.length test_spec.insert_elements + Array.length test_spec.search_elements - 1)
       ~body:(fun i ->
           Mutex.lock t.mutex;
@@ -116,7 +116,7 @@ module Batched = struct
     tree
 
   let run pool (tree: t) test_spec =
-    Domainslib.Task.parallel_for pool
+    Domainslib.Task.parallel_for pool ~chunk_size:1
       ~start:0 ~finish:(Array.length test_spec.insert_elements + Array.length test_spec.search_elements - 1)
       ~body:(fun i ->
           if i < Array.length test_spec.insert_elements
