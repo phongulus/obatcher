@@ -128,7 +128,7 @@ module Make (V: Map.OrderedType) = struct
           else Finite_vector.split_from y.children t in
         let min_child_capacity = Option.value ~default:0 (min_capacity children) in
         let capacity = t * (min_child_capacity + 1) + min_child_capacity in
-        { n = t - 1; leaf=y.leaf; keys; values; children; no_elements=0; capacity; min_child_capacity } in
+        { n = t - 1; leaf=y.leaf; keys; values; children; no_elements=t - 1; capacity; min_child_capacity } in
       z.no_elements <- t - 1;
       Finite_vector.iter (fun child -> z.no_elements <- z.no_elements + child.no_elements) z.children;
 
@@ -513,13 +513,7 @@ module Make (V: Map.OrderedType) = struct
   let rec par_insert_node ~pool ~max_children (t: 'a Sequential.node) (batch: (V.t * 'a) array) start stop =
     if stop <= start
     then t.min_child_capacity
-    else if t.leaf then begin
-      for i = start to stop - 1 do
-        let key,vl = batch.(i) in
-        ignore (Sequential.insert_node ~max_children t key vl)
-      done;
-      t.min_child_capacity
-    end else if (stop - start) < 8 then begin
+    else if t.leaf || (stop - start) < 8 then begin
       for i = start to stop - 1 do
         let key,vl = batch.(i) in
         ignore (Sequential.insert_node ~max_children t key vl)
@@ -602,9 +596,9 @@ module Make (V: Map.OrderedType) = struct
       (* now, all splits are done, do all in parallel! *)
       let min_child_capacity =
         Domainslib.Task.parallel_for_reduce pool ~start:0 ~finish:(Finite_vector.length sub_intervals - 1) ~body:(fun i ->
-            let start,stop = sub_intervals.!(i) in
-            par_insert_node ~pool ~max_children t.children.!(i) batch start stop
-          ) min t.min_child_capacity in
+          let start,stop = sub_intervals.!(i) in
+          par_insert_node ~pool ~max_children t.children.!(i) batch start stop
+        ) min t.min_child_capacity in
       t.min_child_capacity <- min t.min_child_capacity min_child_capacity;
       t.capacity <- (2 * max_children - 1 - t.n) * (t.min_child_capacity + 1) + t.min_child_capacity;
 
@@ -643,21 +637,19 @@ module Make (V: Map.OrderedType) = struct
     then ignore (Sequential.insert_node ~max_children:t.max_children t.root (fst batch.(start)) (snd batch.(start)))
     else begin                                (* d) insert as much as we can and repeat! *)
       assert (t.root.capacity > 0);
-      ignore (par_insert_node ~pool ~max_children:t.max_children t.root batch start (start + t.root.capacity));
-      par_insert ~pool t batch (start + t.root.capacity) stop
+      let capacity = t.root.capacity in
+      ignore (par_insert_node ~pool ~max_children:t.max_children t.root batch start (start + capacity));
+      par_insert ~pool t batch (start + capacity) stop
     end
 
   let par_insert ~pool t batch =
-    (*     Printf.printf "Batch size %d, Capacity %d, Number of elements %d\n%!" (Array.length batch) t.Sequential.root.capacity (t.Sequential.root.no_elements); *)
-    if (Array.length batch > t.Sequential.root.no_elements ||
-        Array.length batch > 1000)
+    if (Array.length batch > t.Sequential.root.no_elements)
     then begin
       (*  Printf.printf "Here\n%!"; *)
       t.Sequential.root <- par_rebuild ~pool ~max_children:t.Sequential.max_children t.root batch;
       (* Printf.printf "FinishedHere\n%!";*)
     end
-    else Array.iter (fun (k,v) -> Sequential.insert t k v) batch
-  (*         par_insert ~pool t batch 0 (Array.length batch) *)
+    else par_insert ~pool t batch 0 (Array.length batch)
 
   let run (type a) (t: a t) (pool: Domainslib.Task.pool) (ops: a wrapped_op array) : unit =
     let searches : (V.t * (a option -> unit)) list ref = ref [] in
@@ -673,12 +665,8 @@ module Make (V: Map.OrderedType) = struct
         let key, kont = searches.(i) in
         kont (Sequential.search t key)
       );
-    let no_elements = t.Sequential.root.no_elements in
     let inserts = Array.of_list !inserts in
     Sort.sort pool ~compare:(fun (k1,_) (k2,_) -> V.compare k1 k2) inserts;
     par_insert ~pool t inserts
-    (* Printf.printf "No elements %d, No elements + inserts %d, Actual No elements %d\n%!" no_elements (no_elements + Array.length inserts) t.Sequential.root.no_elements;
-       assert (no_elements + Array.length inserts = t.Sequential.root.no_elements) *)
-
 
 end
