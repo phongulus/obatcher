@@ -507,10 +507,10 @@ module Make (V: Map.OrderedType) = struct
     results
 
 
-  let rec par_insert_node ~pool ~max_children (t: 'a Sequential.node) (batch: (V.t * 'a) array) start stop =
+  let rec par_insert_node ?(threshold=8) ~pool ~max_children (t: 'a Sequential.node) (batch: (V.t * 'a) array) start stop =
     if stop <= start
     then t.min_child_capacity
-    else if t.leaf || (stop - start) < 8 then begin
+    else if t.leaf || (stop - start) < threshold then begin
       for i = start to stop - 1 do
         let key,vl = batch.(i) in
         ignore (Sequential.insert_node ~max_children t key vl)
@@ -602,7 +602,7 @@ module Make (V: Map.OrderedType) = struct
       t.capacity
     end
 
-  let rec par_insert ~pool (t: 'a t) (batch: (V.t * 'a) array) start stop =
+  let rec par_insert ?threshold ~pool (t: 'a t) (batch: (V.t * 'a) array) start stop =
     let n = stop - start in
     if n <= 0                                  (* a) we are finished inserting *)
     then ()
@@ -610,10 +610,10 @@ module Make (V: Map.OrderedType) = struct
     then begin
       let key,vl = batch.(start) in
       Sequential.insert t key vl;
-      par_insert ~pool t batch (start + 1) stop
+      par_insert ?threshold ~pool t batch (start + 1) stop
     end         
     else if n <= t.root.capacity               (* b) we are inserting fewer elements than our capacity - good! let's go! *)
-    then ignore (par_insert_node ~pool ~max_children:t.max_children t.root batch start stop)
+    then ignore (par_insert_node ?threshold ~pool ~max_children:t.max_children t.root batch start stop)
     else if 2 * t.max_children - 1 = t.root.n (* c) our root has reached max capacity - split! *)
     then begin
       let s = Sequential.{
@@ -628,23 +628,23 @@ module Make (V: Map.OrderedType) = struct
         } in
       t.root <- s;
       Sequential.split_child s 0;
-      par_insert ~pool t batch start stop
+      par_insert ?threshold ~pool t batch start stop
     end 
     else if n = 1
     then ignore (Sequential.insert_node ~max_children:t.max_children t.root (fst batch.(start)) (snd batch.(start)))
     else begin                                (* d) insert as much as we can and repeat! *)
       assert (t.root.capacity > 0);
       let capacity = t.root.capacity in
-      ignore (par_insert_node ~pool ~max_children:t.max_children t.root batch start (start + capacity));
-      par_insert ~pool t batch (start + capacity) stop
+      ignore (par_insert_node ?threshold ~pool ~max_children:t.max_children t.root batch start (start + capacity));
+      par_insert ?threshold ~pool t batch (start + capacity) stop
     end
 
-  let par_insert ~pool t batch =
-    if (Array.length batch > t.Sequential.root.no_elements)
+  let par_insert ?threshold ?(can_rebuild=true) ~pool t batch =
+    if (Array.length batch > t.Sequential.root.no_elements) && can_rebuild
     then begin
       t.Sequential.root <- par_rebuild ~pool ~max_children:t.Sequential.max_children t.root batch;
     end
-    else par_insert ~pool t batch 0 (Array.length batch)
+    else par_insert ?threshold ~pool t batch 0 (Array.length batch)
 
   let run (type a) (t: a t) (pool: Domainslib.Task.pool) (ops: a wrapped_op array) : unit =
     let searches : (V.t * (a option -> unit)) list ref = ref [] in

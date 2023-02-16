@@ -244,7 +244,7 @@ module ExplicitlyBatched = struct
       tree)
 
   let run pool (tree: t) test_spec =
-    IntBtree.par_insert ~pool tree test_spec.sorted_insert_elements;
+    IntBtree.par_insert ~can_rebuild:false ~pool tree test_spec.sorted_insert_elements;
     if Array.length test_spec.spec.search_elements > 0 then
       ignore @@ IntBtree.par_search ~pool tree test_spec.spec.search_elements
 
