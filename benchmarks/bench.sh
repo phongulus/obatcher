@@ -4,9 +4,9 @@ NOW=$(date)
 
 printf "\n\n%s\n" "$NOW" >> $LOG
 if [[ $OSTYPE == 'darwin'* ]]; then
-  sysctl -a | grep machdep.cpu >> ./test_stats.txt
+  sysctl -a | grep machdep.cpu >> $LOG
 elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    lscpu >> ./test_stats.txt
+    lscpu >> $LOG
 fi
 
-make -s >> ./test_stats.txt
+make -s >> $LOG

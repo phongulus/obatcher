@@ -4,6 +4,7 @@ ITER := 2
 bench : test_params counter skiplist btree
 
 test_params :
+	dune build
 	printf "TESTPARAMS -- Warmup = %d, Iterations = %d\n" $(WARMUP) $(ITER)
 
 C_OPS := 10_000_000

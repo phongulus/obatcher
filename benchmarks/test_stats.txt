@@ -107,3 +107,103 @@ Btree-Batched
 1.51440s ± 0.01273s
 1.76723s ± 0.04390s
 1.91818s ± 0.01020s
+
+
+Thu 16 Feb 2023 03:18:49 AM +08
+Architecture:                    x86_64
+CPU op-mode(s):                  32-bit, 64-bit
+Address sizes:                   39 bits physical, 48 bits virtual
+Byte Order:                      Little Endian
+CPU(s):                          8
+On-line CPU(s) list:             0-7
+Vendor ID:                       GenuineIntel
+Model name:                      11th Gen Intel(R) Core(TM) i7-1185G7 @ 3.00GHz
+CPU family:                      6
+Model:                           140
+Thread(s) per core:              2
+Core(s) per socket:              4
+Socket(s):                       1
+Stepping:                        1
+CPU(s) scaling MHz:              23%
+CPU max MHz:                     4800.0000
+CPU min MHz:                     400.0000
+BogoMIPS:                        5990.40
+Flags:                           fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf tsc_known_freq pni pclmulqdq dtes64 monitor ds_cpl smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb cat_l2 invpcid_single cdp_l2 ssbd ibrs ibpb stibp ibrs_enhanced fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid rdt_a avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb intel_pt avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves split_lock_detect dtherm ida arat pln pts hwp hwp_notify hwp_act_window hwp_epp hwp_pkg_req avx512vbmi umip pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg tme avx512_vpopcntdq rdpid movdiri movdir64b fsrm avx512_vp2intersect md_clear ibt flush_l1d arch_capabilities
+L1d cache:                       192 KiB (4 instances)
+L1i cache:                       128 KiB (4 instances)
+L2 cache:                        5 MiB (4 instances)
+L3 cache:                        12 MiB (1 instance)
+NUMA node(s):                    1
+NUMA node0 CPU(s):               0-7
+Vulnerability Itlb multihit:     Not affected
+Vulnerability L1tf:              Not affected
+Vulnerability Mds:               Not affected
+Vulnerability Meltdown:          Not affected
+Vulnerability Mmio stale data:   Not affected
+Vulnerability Retbleed:          Not affected
+Vulnerability Spec store bypass: Mitigation; Speculative Store Bypass disabled via prctl
+Vulnerability Spectre v1:        Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+Vulnerability Spectre v2:        Mitigation; Enhanced IBRS, IBPB conditional, RSB filling, PBRSB-eIBRS SW sequence
+Vulnerability Srbds:             Not affected
+Vulnerability Tsx async abort:   Not affected
+TESTPARAMS -- Warmup = 2, Iterations = 2
+Counter-Sequential
+0.01583s ± 0.00001s
+Counter-Coarse-Grained
+0.16186s ± 0.00468s
+1.49992s ± 0.29778s
+0.80933s ± 0.03434s
+0.98028s ± 0.05845s
+2.13702s ± 0.34292s
+2.52565s ± 0.01115s
+2.82454s ± 0.00665s
+3.08514s ± 0.00266s
+Counter-Batched
+0.89271s ± 0.00188s
+4.45068s ± 0.00843s
+4.48820s ± 0.04319s
+4.87426s ± 0.00888s
+4.13964s ± 0.06892s
+4.10028s ± 0.04331s
+4.01759s ± 0.08470s
+4.39970s ± 0.08780s
+Skiplist-Sequential
+3.88955s ± 0.00954s
+Skiplist-Coarse-Grained
+4.10483s ± 0.04149s
+4.22980s ± 0.03597s
+4.16217s ± 0.01502s
+4.23787s ± 0.11208s
+4.10662s ± 0.02667s
+4.18871s ± 0.16542s
+4.29264s ± 0.02834s
+4.17788s ± 0.21144s
+Skiplist-Batched
+4.79399s ± 0.05583s
+3.72565s ± 0.01683s
+2.91718s ± 0.02338s
+2.47851s ± 0.12386s
+2.56244s ± 0.04516s
+2.45079s ± 0.16820s
+2.34377s ± 0.20458s
+2.15866s ± 0.18109s
+Btree-Sequential
+0.94618s ± 0.00784s
+Btree-Coarse-Grained
+0.96278s ± 0.04784s
+1.34328s ± 0.06648s
+1.74733s ± 0.03189s
+1.71966s ± 0.01009s
+1.70765s ± 0.00371s
+1.71405s ± 0.00453s
+1.73006s ± 0.01185s
+1.72816s ± 0.01095s
+Btree-Batched
+1.08517s ± 0.04221s
+1.11101s ± 0.02326s
+1.44711s ± 0.05105s
+1.52254s ± 0.00860s
+1.98122s ± 0.01336s
+2.23406s ± 0.01399s
+2.35448s ± 0.00723s
+2.53373s ± 0.00277s
