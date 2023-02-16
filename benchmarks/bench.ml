@@ -38,6 +38,7 @@ let () =
   Hashtbl.add benchmarks "btree-sequential" (module Btree.Sequential);
   Hashtbl.add benchmarks "btree-coarse-grained" (module Btree.CoarseGrained);
   Hashtbl.add benchmarks "btree-batched" (module Btree.Batched);
+  Hashtbl.add benchmarks "btree-explicitly-batched" (module Btree.ExplicitlyBatched);
   Hashtbl.add benchmarks "counter-sequential" (module Counter.Sequential);
   Hashtbl.add benchmarks "counter-coarse-grained" (module Counter.CoarseGrained);
   Hashtbl.add benchmarks "counter-batched" (module Counter.Batched);

@@ -216,3 +216,63 @@ module Batched = struct
 
 end
 
+
+module ExplicitlyBatched = struct
+
+  type t = unit IntBtree.t
+
+  type test_spec = {
+    spec: generic_test_spec;
+    mutable sorted_insert_elements: (int * unit) array;
+  }
+
+  type spec_args = generic_spec_args
+
+  let spec_args: spec_args Cmdliner.Term.t = generic_spec_args
+
+  let test_spec ~count spec_args =
+    let spec = generic_test_spec ~count spec_args in
+    {spec; sorted_insert_elements=[||]}
+
+  let init _pool (test_spec: test_spec) =
+    generic_init test_spec.spec (fun initial_elements ->
+      let tree = IntBtree.Sequential.init ~max_children:4 () in
+      test_spec.sorted_insert_elements <- Array.map (fun i -> (i, ())) test_spec.spec.insert_elements;
+      Array.sort (fun (k1,_) (k2, _) -> Int.compare k1 k2) test_spec.sorted_insert_elements;
+      Array.iter (fun i -> IntBtree.Sequential.insert tree i ())
+        initial_elements;
+      tree)
+
+  let run pool (tree: t) test_spec =
+    IntBtree.par_insert ~pool tree test_spec.sorted_insert_elements;
+    if Array.length test_spec.spec.search_elements > 0 then
+      ignore @@ IntBtree.par_search ~pool tree test_spec.spec.search_elements
+
+  let cleanup (t: t) (test: test_spec) =
+    if test.spec.args.should_validate then begin
+      if t.IntBtree.Sequential.root.no_elements <> Array.length test.spec.insert_elements + Array.length test.spec.initial_elements
+      then Format.ksprintf failwith "Inserted %d elements, but found only %d in the tree"
+             (Array.length test.spec.insert_elements + Array.length test.spec.initial_elements)
+             t.IntBtree.Sequential.root.no_elements;
+      let btree_flattened = IntBtree.flatten t.root |> Array.of_seq in
+      let all_elements = Array.concat [test.spec.insert_elements; test.spec.initial_elements] in
+      Array.sort Int.compare all_elements;
+      if Array.length btree_flattened <> Array.length all_elements then
+        Format.ksprintf failwith "length of flattened btree (%d) did not match inserts (%d) (no_elements=%d)"
+          (Array.length btree_flattened) (Array.length all_elements) (t.root.no_elements);
+
+      for i = 0 to Array.length btree_flattened - 1 do
+        if fst btree_flattened.(i) <> all_elements.(i) then
+          Format.ksprintf failwith "element %d of the btree was expected to be %d, but got %d" i
+            all_elements.(i) (fst btree_flattened.(i));
+      done;
+
+      Array.iter (fun elt ->
+        match IntBtree.Sequential.search t elt with
+        | Some _ -> ()
+        | None -> Format.ksprintf failwith "Could not find inserted element %d in tree" elt
+      ) test.spec.insert_elements;
+    end
+
+end
+
