@@ -2,7 +2,8 @@ import subprocess
 import matplotlib.pyplot as plt
 from tqdm.notebook import tqdm
 
-def run_process(name, no_iters=5, count=1_000_000, domains=16, validate=False, verbose=False, init_count=None, sorted=None):
+def run_process(name, no_iters=5, count=1_000_000, domains=16, validate=False, verbose=False, init_count=None, sorted=None,
+                no_searches=None):
     cmd = ["../_build/default/benchmarks/bench.exe", name, "-D", str(domains), "--no-iter", str(no_iters), "--count", str(count)]
     if validate:
         cmd += ["-T"]
@@ -10,6 +11,9 @@ def run_process(name, no_iters=5, count=1_000_000, domains=16, validate=False, v
         cmd += ["--init-count", str(init_count)]
     if sorted:
         cmd += ["-s"]
+    if no_searches:
+        cmd += ["--no-searches", str(no_searches)]
+
     result = subprocess.run(cmd, capture_output=True)
     stdout = result.stdout.decode("utf-8").splitlines()
     for output in stdout[:-1]:

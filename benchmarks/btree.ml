@@ -236,7 +236,7 @@ module ExplicitlyBatched = struct
 
   let init _pool (test_spec: test_spec) =
     generic_init test_spec.spec (fun initial_elements ->
-      let tree = IntBtree.Sequential.init ~max_children:4 () in
+      let tree = IntBtree.Sequential.init ~max_children:32 () in
       test_spec.sorted_insert_elements <- Array.map (fun i -> (i, ())) test_spec.spec.insert_elements;
       Array.sort (fun (k1,_) (k2, _) -> Int.compare k1 k2) test_spec.sorted_insert_elements;
       Array.iter (fun i -> IntBtree.Sequential.insert tree i ())
@@ -244,7 +244,8 @@ module ExplicitlyBatched = struct
       tree)
 
   let run pool (tree: t) test_spec =
-    IntBtree.par_insert ~can_rebuild:false ~pool tree test_spec.sorted_insert_elements;
+    if Array.length test_spec.sorted_insert_elements > 0 then
+      IntBtree.par_insert ~can_rebuild:false ~pool tree test_spec.sorted_insert_elements;
     if Array.length test_spec.spec.search_elements > 0 then
       ignore @@ IntBtree.par_search ~pool tree test_spec.spec.search_elements
 
