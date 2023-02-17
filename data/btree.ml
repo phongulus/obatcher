@@ -1,7 +1,7 @@
 [@@@warning "-32-26"]
 let btree_insert_sequential_threshold = ref None
 let btree_search_sequential_threshold = ref None
-let btree_max_children = ref 32
+let btree_max_children = ref 8
 
 module Make (V: Map.OrderedType) = struct
 
@@ -59,7 +59,8 @@ module Make (V: Map.OrderedType) = struct
       pp_node ?pp_v f fmt t.root
     let show ?pp_v f vl = Format.asprintf "%a" (pp ?pp_v f) vl
 
-    let init ?(max_children=3) () =
+    let init ?max_children () =
+      let max_children = match max_children with Some v -> v | None -> !btree_max_children in
       let root = {
         n=0;
         leaf=true;

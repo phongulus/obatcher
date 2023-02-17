@@ -9,6 +9,9 @@ type generic_spec_args = {
   max: int;
   initial_count: int;
   should_validate: bool;
+  search_threshold: int option;
+  insert_threshold: int option;
+  branching_factor: int option;
 }
 
 type generic_test_spec = {
@@ -33,18 +36,47 @@ let generic_spec_args: generic_spec_args Cmdliner.Term.t =
     Arg.(value @@ opt (some int) None @@ info ~doc:"Maximum value of data for random inputs" ["max"]) in
   let validate =
     Arg.(value @@ flag @@ info ~doc:"Whether the tests should validate the results of the benchmarks" ["T"]) in
+  let search_threshold =
+    Arg.(value @@ opt (some int) None @@
+         info ~doc:"Threshold upon which searches should be sequential" ["search-threshold"]) in
+  let insert_threshold =
+    Arg.(value @@ opt (some int) None @@
+         info ~doc:"Threshold upon which searches should be sequential" ["insert-threshold"]) in
+  let branching_factor =
+    Arg.(value @@ opt (some int) None @@
+         info ~doc:"Branching factor of tree" ["branching-factor"]) in
 
-  Term.(const (fun sorted no_searches min max initial_count validate -> {
+  Term.(const (fun sorted no_searches min max
+                initial_count validate search_threshold insert_threshold
+                branching_factor -> {
       sorted;
       no_searches=Option.value ~default:0 no_searches;
       initial_count=Option.value ~default:0 initial_count;
       min=Option.value ~default:0 min;
       max=Option.value ~default:((Int.shift_left 1 30) - 1) max;
-      should_validate=validate
-    }) $ sorted $ no_searches $ min $ max $ initial_count $ validate)
+      should_validate=validate;
+      search_threshold;
+      insert_threshold;
+      branching_factor
+    }) $ sorted $ no_searches $ min $ max $ initial_count $
+        validate $ search_threshold $ insert_threshold $ branching_factor)
 
 let generic_test_spec ~count spec_args =
   { args=spec_args; count: int; insert_elements=[| |]; search_elements=[| |]; initial_elements=[| |] }
+
+let generic_run test_spec f =
+  let old_search_threshold = !Data.Btree.btree_search_sequential_threshold in
+  let old_insert_threshold = !Data.Btree.btree_search_sequential_threshold in
+  let old_branching_factor = !Data.Btree.btree_max_children in
+  Data.Btree.btree_search_sequential_threshold := test_spec.args.search_threshold;
+  Data.Btree.btree_insert_sequential_threshold := test_spec.args.insert_threshold;
+  Option.iter (fun vl -> Data.Btree.btree_max_children := vl)
+    test_spec.args.branching_factor;
+  let res = f () in
+  Data.Btree.btree_search_sequential_threshold := old_search_threshold;
+  Data.Btree.btree_insert_sequential_threshold := old_insert_threshold;
+  Data.Btree.btree_max_children := old_branching_factor;
+  res
 
 let generic_init test_spec f =
   let min, max =  test_spec.args.min, test_spec.args.max in
@@ -66,7 +98,8 @@ let generic_init test_spec f =
   test_spec.insert_elements <- insert_elements;
   test_spec.initial_elements <- initial_elements;
   test_spec.search_elements <- search_elements;
-  f initial_elements
+  generic_run test_spec @@ fun () -> f initial_elements 
+  
 
 module Sequential = struct
 
@@ -83,7 +116,7 @@ module Sequential = struct
 
   let init _pool test_spec =
     generic_init test_spec (fun initial_elements ->
-      let tree = IntBtree.Sequential.init ~max_children:32 () in
+      let tree = IntBtree.Sequential.init () in
       Array.iter (fun i -> IntBtree.Sequential.insert tree i ())
         initial_elements;
       tree
@@ -91,6 +124,7 @@ module Sequential = struct
 
 
   let run _pool t test_spec =
+    generic_run test_spec @@ fun () -> 
     Array.iter (fun i ->
         IntBtree.Sequential.insert t i ()
       ) test_spec.insert_elements;
@@ -125,7 +159,7 @@ module CoarseGrained = struct
 
   let init _pool test_spec =
     generic_init test_spec (fun initial_elements ->
-      let tree = IntBtree.Sequential.init ~max_children:32 () in
+      let tree = IntBtree.Sequential.init () in
       Array.iter (fun i -> IntBtree.Sequential.insert tree i ())
         initial_elements;
       let mutex = Mutex.create () in
@@ -133,6 +167,7 @@ module CoarseGrained = struct
     )
 
   let run pool (t: t) test_spec =
+    generic_run test_spec @@ fun () ->
     Domainslib.Task.parallel_for pool ~chunk_size:1
       ~start:0 ~finish:(Array.length test_spec.insert_elements + Array.length test_spec.search_elements - 1)
       ~body:(fun i ->
@@ -178,6 +213,7 @@ module Batched = struct
       tree)
 
   let run pool (tree: t) test_spec =
+    generic_run test_spec @@ fun () -> 
     Domainslib.Task.parallel_for pool ~chunk_size:1
       ~start:0 ~finish:(Array.length test_spec.insert_elements + Array.length test_spec.search_elements - 1)
       ~body:(fun i ->
@@ -187,6 +223,7 @@ module Batched = struct
           ignore (BatchedIntBtree.apply tree (Search test_spec.search_elements.(i - Array.length test_spec.insert_elements)))
       )
 
+    
   let cleanup (t: t) (test_spec: test_spec) =
     let t = BatchedIntBtree.unsafe_get_internal_data t in
     if test_spec.args.should_validate then begin
@@ -236,7 +273,7 @@ module ExplicitlyBatched = struct
 
   let init _pool (test_spec: test_spec) =
     generic_init test_spec.spec (fun initial_elements ->
-      let tree = IntBtree.Sequential.init ~max_children:32 () in
+      let tree = IntBtree.Sequential.init () in
       test_spec.sorted_insert_elements <- Array.map (fun i -> (i, ())) test_spec.spec.insert_elements;
       Array.sort (fun (k1,_) (k2, _) -> Int.compare k1 k2) test_spec.sorted_insert_elements;
       Array.iter (fun i -> IntBtree.Sequential.insert tree i ())
@@ -244,6 +281,7 @@ module ExplicitlyBatched = struct
       tree)
 
   let run pool (tree: t) test_spec =
+    generic_run test_spec.spec @@ fun () -> 
     if Array.length test_spec.sorted_insert_elements > 0 then
       IntBtree.par_insert ~can_rebuild:false ~pool tree test_spec.sorted_insert_elements;
     if Array.length test_spec.spec.search_elements > 0 then

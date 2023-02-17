@@ -2,8 +2,17 @@ import subprocess
 import matplotlib.pyplot as plt
 from tqdm.notebook import tqdm
 
-def run_process(name, no_iters=5, count=1_000_000, domains=16, validate=False, verbose=False, init_count=None, sorted=None,
-                no_searches=None):
+def run_process(name, no_iters=5, count=1_000_000,
+                domains=16,
+                validate=False,
+                verbose=False,
+                init_count=None,
+                sorted=None,
+                no_searches=None,
+                search_threshold=None,
+                insert_threshold=None,
+                branching_factor=None
+                ):
     cmd = ["../_build/default/benchmarks/bench.exe", name, "-D", str(domains), "--no-iter", str(no_iters), "--count", str(count)]
     if validate:
         cmd += ["-T"]
@@ -13,6 +22,12 @@ def run_process(name, no_iters=5, count=1_000_000, domains=16, validate=False, v
         cmd += ["-s"]
     if no_searches:
         cmd += ["--no-searches", str(no_searches)]
+    if search_threshold:
+        cmd += ["--search-threshold", str(search_threshold)]
+    if insert_threshold:
+        cmd += ["--insert-threshold", str(insert_threshold)]
+    if branching_factor:
+        cmd += ["--branching-factor", str(branching_factor)]
 
     result = subprocess.run(cmd, capture_output=True)
     stdout = result.stdout.decode("utf-8").splitlines()
