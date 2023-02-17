@@ -1,4 +1,8 @@
 [@@@warning "-32-26"]
+let btree_insert_sequential_threshold = ref None
+let btree_search_sequential_threshold = ref None
+let btree_max_children = ref 32
+
 module Make (V: Map.OrderedType) = struct
 
   let (.!()) x v = Finite_vector.get x v
@@ -213,7 +217,9 @@ module Make (V: Map.OrderedType) = struct
 
   type 'a wrapped_op = Mk : ('a, 'b) op * ('b -> unit) -> 'a wrapped_op
 
-  let init () = Sequential.init ~max_children:4 ()
+  let init () =
+    let max_children = !btree_max_children in
+    Sequential.init ~max_children ()
 
   let fold_left_map f accu l =
     let rec aux accu l_accu = function
@@ -459,12 +465,9 @@ module Make (V: Map.OrderedType) = struct
       build_from_sorted ~max_children ~pool batch
     end
 
-  let rec par_search_node : Domainslib.Task.pool -> 'a Sequential.node ->
-    keys:(V.t * int) array -> results:'a option array -> range:(int * int)
-    -> unit =
-    fun pool node ~keys ~results ~range:(rstart, rstop) ->
+  let rec par_search_node ?(threshold=8) pool node ~keys ~results ~range:(rstart, rstop) =
     (* if the no elements in the node are greater than the number of keys we're searching for, then just do normal search in parallel *)
-    if node.no_elements > (rstop - rstart) && false then
+    if (rstop - rstart) < threshold then
       Domainslib.Task.parallel_for pool ~start:rstart ~finish:(rstop - 1) ~body:(fun i ->
           let (k,ind) = keys.(i) in
           results.(ind) <- Option.map (fun (node,i) -> node.Sequential.values.!(i)) (Sequential.search_node node k)
@@ -492,18 +495,18 @@ module Make (V: Map.OrderedType) = struct
         |> Array.of_list in
       if not node.leaf then
         Domainslib.Task.parallel_for pool ~start:0 ~finish:(Array.length children - 1) ~body:(fun i ->
-            par_search_node pool node.children.!(i) ~keys ~results ~range:children.(i)
+            par_search_node ~threshold pool node.children.!(i) ~keys ~results ~range:children.(i)
           );
     end
 
-  let par_search ~pool (t: 'a t) ks =
+  let par_search ?threshold ~pool (t: 'a t) ks =
+    let threshold = match threshold with Some _ -> threshold | None -> !btree_search_sequential_threshold in
     (* keys is a array of (key, index) where index is the position in the original search query *)
     let keys = Array.mapi (fun ind ks -> (ks, ind)) ks in
     Array.fast_sort (fun (k, _) (k', _) -> V.compare k k') keys;
     (* allocate a buffer for the results *)
     let results: 'a option array = Array.make (Array.length ks) None in
-    Domainslib.Task.run pool
-      (fun () -> par_search_node pool t.root ~keys ~results ~range:(0, Array.length keys));
+    par_search_node ?threshold pool t.root ~keys ~results ~range:(0, Array.length keys);
     results
 
 
@@ -649,6 +652,7 @@ module Make (V: Map.OrderedType) = struct
     end
 
   let par_insert ?threshold ?(can_rebuild=true) ~pool t batch =
+    let threshold = match threshold with Some _ -> threshold | None -> !btree_insert_sequential_threshold in
     if (Array.length batch > t.Sequential.root.no_elements) && can_rebuild
     then begin
       t.Sequential.root <- par_rebuild ~pool ~max_children:t.Sequential.max_children t.root batch;

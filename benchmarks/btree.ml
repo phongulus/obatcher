@@ -83,7 +83,7 @@ module Sequential = struct
 
   let init _pool test_spec =
     generic_init test_spec (fun initial_elements ->
-      let tree = IntBtree.Sequential.init ~max_children:4 () in
+      let tree = IntBtree.Sequential.init ~max_children:32 () in
       Array.iter (fun i -> IntBtree.Sequential.insert tree i ())
         initial_elements;
       tree
@@ -125,7 +125,7 @@ module CoarseGrained = struct
 
   let init _pool test_spec =
     generic_init test_spec (fun initial_elements ->
-      let tree = IntBtree.Sequential.init ~max_children:4 () in
+      let tree = IntBtree.Sequential.init ~max_children:32 () in
       Array.iter (fun i -> IntBtree.Sequential.insert tree i ())
         initial_elements;
       let mutex = Mutex.create () in
