@@ -1,5 +1,7 @@
 # Domainslibs Fork - Batching support
 
+Note: For the jupyter notebook, you will need `ipympl` installed.
+
 This fork introduces support for a technique called "batching" which aims to increase data structure throughput of programs. In programs that run with "batching" support, data structure operations can be processed as a logical "batch" instead of atomic operations which reduces synchronization overhead and opens up more opportunities for optimisation. The goal of this work is to provide the scheduling infrastructure for the community to innovate and build new data structures for OCaml that stand to benefit from batching.
 
 The main contributions of our work include:
