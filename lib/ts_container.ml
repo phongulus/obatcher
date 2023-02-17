@@ -13,12 +13,12 @@ module ChanBased = struct
       batch_limit;
     }
   let add t elt =
-    let _ = Atomic.fetch_and_add t.size 1 in
+    ignore @@ Atomic.fetch_and_add t.size 1;
     Chan.send t.chan elt
   let get t = 
     let batch_size = Atomic.exchange t.size 0 in
     let limit = min batch_size t.batch_limit in
-    let topup = max (batch_size - limit) 0 in
+    let topup = batch_size - limit in
     let _ = Atomic.fetch_and_add t.size topup in
     Array.init limit (fun _ -> Chan.recv t.chan)
   let size t = Atomic.get t.size 
