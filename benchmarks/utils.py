@@ -10,6 +10,7 @@ def run_process(name, no_iters=5, count=1_000_000,
                 sorted=None,
                 no_searches=None,
                 search_threshold=None,
+                search_par_threshold=None,
                 insert_threshold=None,
                 branching_factor=None
                 ):
@@ -24,6 +25,8 @@ def run_process(name, no_iters=5, count=1_000_000,
         cmd += ["--no-searches", str(no_searches)]
     if search_threshold:
         cmd += ["--search-threshold", str(search_threshold)]
+    if search_par_threshold:
+        cmd += ["--search-par-threshold", str(search_par_threshold)]
     if insert_threshold:
         cmd += ["--insert-threshold", str(insert_threshold)]
     if branching_factor:
