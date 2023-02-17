@@ -61,6 +61,35 @@ let generic_init test_spec f =
   test_spec.search_elements <- search_elements;
   f initial_elements
 
+module Sequential = struct
+
+  type t = IntSet.t ref
+
+  type spec_args = generic_spec_args
+  let spec_args = generic_spec_args
+
+  type test_spec = generic_test_spec
+  let test_spec = generic_test_spec
+
+  let init _pool test_spec =
+    generic_init test_spec (fun initial_elements ->
+      let set = IntSet.of_seq (Array.to_seq initial_elements) in
+      ref set
+    )
+
+  let run _pool (t: t) test_spec =
+    for i = 0 to Array.length test_spec.insert_elements - 1 do
+      t := IntSet.add test_spec.insert_elements.(i) !t
+    done;
+    for i = 0 to Array.length test_spec.search_elements - 1 do
+       ignore (IntSet.mem test_spec.search_elements.(i) !t)
+    done
+
+  let cleanup (_t: t) (_test_spec: test_spec) = ()
+
+end
+
+
 module CoarseGrained = struct
 
   type t = {

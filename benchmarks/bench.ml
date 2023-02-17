@@ -47,8 +47,10 @@ let () =
   Hashtbl.add benchmarks "skiplist-batched" (module Skiplist.Batched);
   Hashtbl.add benchmarks "set-coarse-grained" (module Vanilla_set.CoarseGrained);
   Hashtbl.add benchmarks "set-batched" (module Vanilla_set.Batched);
+  Hashtbl.add benchmarks "set-sequential" (module Vanilla_set.Sequential);
   Hashtbl.add benchmarks "map-coarse-grained" (module Vanilla_map.CoarseGrained);
-  Hashtbl.add benchmarks "map-batched" (module Vanilla_map.Batched)
+  Hashtbl.add benchmarks "map-batched" (module Vanilla_map.Batched);
+  Hashtbl.add benchmarks "map-sequential" (module Vanilla_map.Sequential)
 
 
 let run_benchmark (type a) (module B: BENCHMARK with type spec_args = a)
