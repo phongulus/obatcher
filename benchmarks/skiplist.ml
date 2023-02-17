@@ -35,7 +35,7 @@ let generic_spec_args: generic_spec_args Cmdliner.Term.t =
       sorted;
       no_searches=Option.value ~default:0 no_searches;
       no_size=Option.value ~default:0 no_size;
-      initial_count=Option.value ~default:1_000 initial_count;
+      initial_count=Option.value ~default:0 initial_count;
       min=Option.value ~default:0 min;
       max=Option.value ~default:((Int.shift_left 1 30) - 1) max;
     }) $ sorted $ no_searches $ no_size $ initial_count $ min $ max)

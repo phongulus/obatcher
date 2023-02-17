@@ -37,7 +37,7 @@ let generic_spec_args: generic_spec_args Cmdliner.Term.t =
   Term.(const (fun sorted no_searches min max initial_count validate -> {
       sorted;
       no_searches=Option.value ~default:0 no_searches;
-      initial_count=Option.value ~default:1_000 initial_count;
+      initial_count=Option.value ~default:0 initial_count;
       min=Option.value ~default:0 min;
       max=Option.value ~default:((Int.shift_left 1 30) - 1) max;
       should_validate=validate
