@@ -44,7 +44,12 @@ let () =
   Hashtbl.add benchmarks "counter-batched" (module Counter.Batched);
   Hashtbl.add benchmarks "skiplist-sequential" (module Skiplist.Sequential);
   Hashtbl.add benchmarks "skiplist-coarse-grained" (module Skiplist.CoarseGrained);
-  Hashtbl.add benchmarks "skiplist-batched" (module Skiplist.Batched)
+  Hashtbl.add benchmarks "skiplist-batched" (module Skiplist.Batched);
+  Hashtbl.add benchmarks "set-coarse-grained" (module Vanilla_set.CoarseGrained);
+  Hashtbl.add benchmarks "set-batched" (module Vanilla_set.Batched);
+  Hashtbl.add benchmarks "map-coarse-grained" (module Vanilla_map.CoarseGrained);
+  Hashtbl.add benchmarks "map-batched" (module Vanilla_map.Batched)
+
 
 let run_benchmark (type a) (module B: BENCHMARK with type spec_args = a)
     show_progress no_domains no_warmup no_iter count (args: a) =
