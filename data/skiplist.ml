@@ -139,6 +139,25 @@ module Make (V : Stdlib.Map.OrderedType) = struct
       let first_val = !^starting_point.value in
       walk first_val !>starting_point.(0)
 
+    let print_slist t to_string =
+      let print_level t lvl =
+        let rec aux = function
+          | Null -> print_endline "Null"
+          | Hd forward ->
+            Printf.printf "Level %d : Hd -> " lvl;
+            aux forward.(lvl)
+          | Node {value; forward; _} ->
+            let val_str = to_string value in
+            Printf.printf "(%s) -> " val_str;
+            aux forward.(lvl)
+        in
+        aux t.hdr
+      in
+      for lvl = !(t.level) downto 0 do
+        print_level t lvl;
+        Printf.printf "\n"
+      done
+
   end
 
   type t = Sequential.t

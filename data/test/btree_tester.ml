@@ -56,7 +56,7 @@ let () =
     Btree.Sequential.insert btree k vl;
     dump_btree fname btree;
     print_btree btree
-  | "build":: fname :: max_children :: keys :: (([] | [_])  as rest) ->
+  | "build":: _fname :: max_children :: keys :: (([] | [_])  as rest) ->
     let max_children = int_of_string max_children in
     let keys = String.split_on_char ',' keys |> List.map int_of_string |> Array.of_list in
     let keys_vals = Array.map (fun k -> (k, "key " ^ string_of_int k)) keys in
