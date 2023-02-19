@@ -314,6 +314,18 @@ module Make (V : Stdlib.Map.OrderedType) = struct
       done;
     done
 
+  let par_search t (pool : Domainslib.Task.pool) (elems : V.t array) : bool array =
+    let result_arr = Array.make (Array.length elems) false in
+    Domainslib.Task.parallel_for pool ~start:0 ~finish:((Array.length elems) - 1)
+      ~body:(fun i -> result_arr.(i) <- Sequential.mem t elems.(i));
+    result_arr
+
+  let par_size t (pool : Domainslib.Task.pool) (elems : int array) : int array =
+    let size = Sequential.size t in
+    Domainslib.Task.parallel_for pool ~start:0 ~finish:((Array.length elems) - 1)
+      ~body:(fun i -> elems.(i) <- size);
+    elems
+
   let run t (pool: Domainslib.Task.pool) (ops: wrapped_op array) : unit =
     let inserts: V.t list ref = ref [] in
     let searches: (V.t * (bool -> unit)) list ref = ref [] in

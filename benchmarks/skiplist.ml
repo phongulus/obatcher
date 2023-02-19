@@ -1,5 +1,7 @@
 module IntSkiplist = Data.Skiplist.Make(Int)
 module BatchedSkiplist = Domainslib.Batcher.Make(Data.Skiplist.Make(Int))
+module ExplicitlyBatchedSkiplist = Data.Skiplist.Make(Int)
+module LazySkiplist = Data.Lazy_slist.Make(struct include Int let hash t = t end)
 
 type generic_test_spec = {
   initial_elements: (unit -> int array);
@@ -160,5 +162,69 @@ module Batched = struct
 
   let cleanup (_t: t) (_test_spec: test_spec) = ()
 
+end
+
+module ExplicitBatched = struct
+
+  type t = ExplicitlyBatchedSkiplist.t
+
+  type test_spec = generic_test_spec
+
+  type spec_args = generic_spec_args
+
+  let spec_args: spec_args Cmdliner.Term.t = generic_spec_args
+
+  let test_spec ~count spec_args =
+    generic_test_spec ~count spec_args
+
+  let init _pool test_spec = 
+    let initial_elements = test_spec.initial_elements () in
+    let skiplist = ExplicitlyBatchedSkiplist.init () in
+    Array.iter (fun i -> ExplicitlyBatchedSkiplist.Sequential.insert skiplist i) initial_elements;
+    skiplist
+
+  let run pool t test_spec =
+    ExplicitlyBatchedSkiplist.par_insert t pool test_spec.insert_elements;
+    if test_spec.size > 0 then ignore @@ ExplicitlyBatchedSkiplist.par_size t pool (Array.make test_spec.size 0);
+    ignore @@ ExplicitlyBatchedSkiplist.par_search t pool test_spec.search_elements
+
+  let cleanup (_t: t) (_test_spec: test_spec) = ()
+
+end
+
+
+module Lazy = struct
+  
+  type t = LazySkiplist.Node.t
+             
+  type test_spec = generic_test_spec
+    
+  type spec_args = generic_spec_args
+    
+  let spec_args : spec_args Cmdliner.Term.t = generic_spec_args
+
+  let test_spec ~count spec_args =
+    generic_test_spec ~count spec_args
+
+  let init _pool test_spec =
+    let initial_elements = test_spec.initial_elements () in
+    LazySkiplist.init ();
+    Array.iter (fun i -> ignore @@ LazySkiplist.add i) initial_elements;
+    LazySkiplist.Node.Null
+      
+  let run pool _t test_spec =
+    let total = Array.length test_spec.insert_elements + Array.length test_spec.search_elements + test_spec.size - 1 in
+    Domainslib.Task.parallel_for pool
+      ~start:0 ~finish:total
+      ~body:(fun i ->
+          if i < Array.length test_spec.insert_elements
+          then ignore @@ LazySkiplist.add test_spec.insert_elements.(i)
+          else if i < Array.length test_spec.insert_elements + Array.length test_spec.search_elements then
+            ignore (LazySkiplist.contains test_spec.search_elements.(i - Array.length test_spec.search_elements))
+          else
+            ignore (LazySkiplist.size ())
+        )
+
+  let cleanup (_t: t) (_test_spec: test_spec) = ()
 end
 

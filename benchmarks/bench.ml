@@ -45,6 +45,8 @@ let () =
   Hashtbl.add benchmarks "skiplist-sequential" (module Skiplist.Sequential);
   Hashtbl.add benchmarks "skiplist-coarse-grained" (module Skiplist.CoarseGrained);
   Hashtbl.add benchmarks "skiplist-batched" (module Skiplist.Batched);
+  Hashtbl.add benchmarks "skiplist-explicitly-batched" (module Skiplist.ExplicitBatched);
+  Hashtbl.add benchmarks "skiplist-lazy" (module Skiplist.Lazy);
   Hashtbl.add benchmarks "set-coarse-grained" (module Vanilla_set.CoarseGrained);
   Hashtbl.add benchmarks "set-batched" (module Vanilla_set.Batched);
   Hashtbl.add benchmarks "set-sequential" (module Vanilla_set.Sequential);
