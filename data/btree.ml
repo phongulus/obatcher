@@ -23,6 +23,7 @@ module Make (V: Map.OrderedType) = struct
 
     type 'a t = {
       mutable root: 'a node;
+      mutable height: int;
       max_children: int;
     }
 
@@ -72,7 +73,7 @@ module Make (V: Map.OrderedType) = struct
         capacity=2 * max_children - 1;
         min_child_capacity=0;
       } in
-      {root; max_children}
+      {root; max_children; height=1}
 
     let rec fold_int_range ~start ~stop f acc =
       if start >= stop
@@ -203,6 +204,7 @@ module Make (V: Map.OrderedType) = struct
           min_child_capacity=r.capacity;
         } in
         tree.root <- s;
+        tree.height <- tree.height + 1;
         split_child s 0;
         ignore (insert_node ~max_children:tree.max_children s k vl)
       end else
@@ -405,7 +407,7 @@ module Make (V: Map.OrderedType) = struct
         let min_child_capacity = Sequential.min_capacity children |> Option.value ~default:0 in
         let capacity = (2 * t - 1 - n) * (min_child_capacity + 1) + min_child_capacity in
         { n; keys; values; leaf=false; children; no_elements=Array.length arr; min_child_capacity; capacity } in
-    root
+    h, root
 
   let rec int_range_downto start stop =
     fun () ->
@@ -454,8 +456,7 @@ module Make (V: Map.OrderedType) = struct
     fun f -> aux i1 None i2 None f
 
   let par_rebuild ~pool ~max_children (root: 'a Sequential.node) (kv_arr : (V.t * 'a) array) =
-    if Array.length kv_arr = 0 then root
-    else begin
+    begin
       (* keys is a array of (key, index) where index is the position in the original search query *)
       let max_children = max_children in
       let batch = Array.make (Array.length kv_arr + root.no_elements) kv_arr.(0) in
@@ -467,24 +468,24 @@ module Make (V: Map.OrderedType) = struct
       build_from_sorted ~max_children ~pool batch
     end
 
-  let rec par_search_node ?(par_threshold=32) ?(threshold=128) pool node ~keys  ~range:(rstart, rstop) =
+  let rec par_search_node ?(par_threshold=6) ?(threshold=64) pool node ~height ~keys  ~range:(rstart, rstop) =
     (* if the no elements in the node are greater than the number of keys we're searching for, then just do normal search in parallel *)
     let n = rstop - rstart in
-    (* Format.printf "par_search batch_size is %d < threshold(%d), leaf?=%b\n%!" *)
-    (*   n threshold node.Sequential.leaf; *)
+    (* Format.printf "par_search batch_size is %d < threshold(%d), leaf?=%b, height=%d\n%!" *)
+    (*   n threshold node.Sequential.leaf height; *)
     if n <= 0 then ()
     else if n = 1 then
       let (k,kont) = keys.(rstart) in
       kont
         (Option.map (fun (node,i) -> node.Sequential.values.!(i))
            (Sequential.search_node node k))
-    else if (rstop - rstart) < par_threshold then
+    else if (rstop - rstart) < par_threshold && height > 5 then
       Domainslib.Task.parallel_for pool ~start:rstart ~finish:(rstop - 1) ~body:(fun i ->
         let (k,kont) = keys.(i) in
         kont (Option.map (fun (node,i) ->
           node.Sequential.values.!(i)) (Sequential.search_node node k)) 
       )
-    else if (rstop - rstart) < threshold || node.Sequential.leaf then
+    else if (rstop - rstart) < threshold && height < 3  || node.Sequential.leaf then
       for i = rstart to rstop - 1 do
         let (k,kont) = keys.(i) in
         kont (Option.map (fun (node,i) -> node.Sequential.values.!(i)) (Sequential.search_node node k))
@@ -515,7 +516,7 @@ module Make (V: Map.OrderedType) = struct
 
       Domainslib.Task.parallel_for pool ~start:0 ~finish:(Finite_vector.length sub_intervals - 1) ~body:(fun i ->
         par_search_node ~par_threshold
-          ~threshold pool node.children.!(i) ~keys
+          ~threshold pool node.children.!(i) ~keys ~height:(height - 1)
           ~range:sub_intervals.!(i)
       );
     end
@@ -526,7 +527,7 @@ module Make (V: Map.OrderedType) = struct
     (* keys is a array of (key, index) where index is the position in the original search query *)
     Sort.sort pool ~compare:(fun (k, _) (k', _) -> V.compare k k') keys;
     (* allocate a buffer for the results *)
-    par_search_node ?par_threshold ?threshold pool t.root ~keys ~range:(0, Array.length keys)
+    par_search_node ?par_threshold ?threshold pool t.root ~height:t.height ~keys ~range:(0, Array.length keys)
 
 
 
@@ -659,6 +660,7 @@ module Make (V: Map.OrderedType) = struct
         min_child_capacity=t.root.min_child_capacity;
       } in
       t.root <- s;
+      t.height <- t.height + 1;
       Sequential.split_child s 0;
       par_insert ?threshold ~pool t batch start stop
     end 
@@ -673,9 +675,11 @@ module Make (V: Map.OrderedType) = struct
 
   let par_insert ?threshold ?(can_rebuild=true) ~pool t batch =
     let threshold = match threshold with Some _ -> threshold | None -> !btree_insert_sequential_threshold in
-    if (Array.length batch > t.Sequential.root.no_elements) && can_rebuild
+    if Array.length batch > 0 && (Array.length batch > t.Sequential.root.no_elements) && can_rebuild
     then begin
-      t.Sequential.root <- par_rebuild ~pool ~max_children:t.Sequential.max_children t.root batch;
+      let height, root = par_rebuild ~pool ~max_children:t.Sequential.max_children t.root batch in
+      t.Sequential.root <- root;
+      t.Sequential.height <- height;
     end
     else par_insert ?threshold ~pool t batch 0 (Array.length batch)
 
