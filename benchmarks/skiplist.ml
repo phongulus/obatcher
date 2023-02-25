@@ -117,7 +117,7 @@ module CoarseGrained = struct
               then IntSkiplist.Sequential.insert t.skiplist test_spec.insert_elements.(i)
               else if i < Array.length test_spec.insert_elements + Array.length test_spec.search_elements then
                 ignore (IntSkiplist.Sequential.mem t.skiplist
-                          test_spec.search_elements.(i - Array.length test_spec.search_elements))
+                          test_spec.search_elements.(i - Array.length test_spec.insert_elements))
               else
                 ignore (IntSkiplist.Sequential.size t.skiplist)
             )
@@ -155,7 +155,7 @@ module Batched = struct
           then BatchedSkiplist.apply t (Insert test_spec.insert_elements.(i))
           else if i < Array.length test_spec.insert_elements + Array.length test_spec.search_elements then
             ignore (BatchedSkiplist.apply t 
-                      (Member test_spec.search_elements.(i - Array.length test_spec.search_elements)))
+                      (Member test_spec.search_elements.(i - Array.length test_spec.insert_elements)))
           else
             ignore (BatchedSkiplist.apply t Size)
         )
@@ -220,7 +220,7 @@ module Lazy = struct
           if i < Array.length test_spec.insert_elements
           then ignore @@ LazySkiplist.add test_spec.insert_elements.(i)
           else if i < Array.length test_spec.insert_elements + Array.length test_spec.search_elements then
-            ignore (LazySkiplist.contains test_spec.search_elements.(i - Array.length test_spec.search_elements))
+            ignore (LazySkiplist.contains test_spec.search_elements.(i - Array.length test_spec.insert_elements))
           else
             ignore (LazySkiplist.size ())
         )
