@@ -117,7 +117,7 @@ module CoarseGrained = struct
         Fun.protect ~finally:(fun () -> Mutex.unlock t.lock) (fun () ->
           if i < Array.length test_spec.insert_elements
           then t.set <- IntSet.add test_spec.insert_elements.(i) t.set
-          else ignore (IntSet.mem test_spec.search_elements.(i - Array.length test_spec.search_elements) t.set)
+          else ignore (IntSet.mem test_spec.search_elements.(i - Array.length test_spec.insert_elements) t.set)
         )
       )
 
@@ -184,7 +184,7 @@ module Batched = struct
       ~body:(fun i ->
         if i < Array.length test_spec.insert_elements
         then BatchedIntSet.apply t (Insert test_spec.insert_elements.(i))
-        else ignore (BatchedIntSet.apply t (Member test_spec.search_elements.(i - Array.length test_spec.search_elements)))
+        else ignore (BatchedIntSet.apply t (Member test_spec.search_elements.(i - Array.length test_spec.insert_elements)))
       )
 
   let cleanup (_t: t) (_test_spec: test_spec) = ()

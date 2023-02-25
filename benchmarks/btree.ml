@@ -184,7 +184,7 @@ module CoarseGrained = struct
               if i < Array.length test_spec.insert_elements
               then IntBtree.Sequential.insert t.tree test_spec.insert_elements.(i) ()
               else ignore (IntBtree.Sequential.search t.tree
-                             test_spec.search_elements.(i - Array.length test_spec.search_elements))
+                             test_spec.search_elements.(i - Array.length test_spec.insert_elements))
             )
         )
 
