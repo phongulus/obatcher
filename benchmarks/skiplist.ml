@@ -109,7 +109,7 @@ module CoarseGrained = struct
   let run pool t test_spec =
     let total = Array.length test_spec.insert_elements + Array.length test_spec.search_elements + test_spec.size - 1 in
     Domainslib.Task.parallel_for pool
-      ~start:0 ~finish:total
+      ~start:0 ~finish:total ~chunk_size:1
       ~body:(fun i ->
           Mutex.lock t.mutex;
           Fun.protect ~finally:(fun () -> Mutex.unlock t.mutex) (fun () ->
@@ -149,7 +149,7 @@ module Batched = struct
   let run pool t test_spec =
     let total = Array.length test_spec.insert_elements + Array.length test_spec.search_elements + test_spec.size - 1 in
     Domainslib.Task.parallel_for pool
-      ~start:0 ~finish:total
+      ~start:0 ~finish:total ~chunk_size:1
       ~body:(fun i ->
           if i < Array.length test_spec.insert_elements
           then BatchedSkiplist.apply t (Insert test_spec.insert_elements.(i))
@@ -215,7 +215,7 @@ module Lazy = struct
   let run pool _t test_spec =
     let total = Array.length test_spec.insert_elements + Array.length test_spec.search_elements + test_spec.size - 1 in
     Domainslib.Task.parallel_for pool
-      ~start:0 ~finish:total
+      ~start:0 ~finish:total ~chunk_size:1
       ~body:(fun i ->
           if i < Array.length test_spec.insert_elements
           then ignore @@ LazySkiplist.add test_spec.insert_elements.(i)

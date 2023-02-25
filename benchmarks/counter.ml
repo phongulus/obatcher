@@ -80,7 +80,7 @@ module CoarseGrained = struct
   let run pool t test_spec =
     let total = test_spec.increments + test_spec.decrements + test_spec.gets in
     Domainslib.Task.parallel_for pool
-      ~start:1 ~finish:total
+      ~start:1 ~finish:total ~chunk_size:1
       ~body:(fun i ->
           Mutex.lock t.mutex;
           Fun.protect ~finally:(fun () -> Mutex.unlock t.mutex) (fun () ->
@@ -114,7 +114,7 @@ module Batched = struct
   let run pool (counter: t) test_spec =
     let total = test_spec.increments + test_spec.decrements + test_spec.gets in
     Domainslib.Task.parallel_for pool
-      ~start:1 ~finish:total
+      ~start:1 ~finish:total ~chunk_size:1
       ~body:(fun i ->
           if i < test_spec.increments 
           then BatchedCounter.apply counter Incr
