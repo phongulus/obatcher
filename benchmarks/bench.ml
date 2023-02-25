@@ -46,7 +46,7 @@ let () =
   Hashtbl.add benchmarks "skiplist-coarse-grained" (module Skiplist.CoarseGrained);
   Hashtbl.add benchmarks "skiplist-batched" (module Skiplist.Batched);
   Hashtbl.add benchmarks "skiplist-explicitly-batched" (module Skiplist.ExplicitBatched);
-  Hashtbl.add benchmarks "skiplist-lazy" (module Skiplist.Lazy);
+  Hashtbl.add benchmarks "skiplist-fine-grained" (module Skiplist.Lazy);
   Hashtbl.add benchmarks "set-coarse-grained" (module Vanilla_set.CoarseGrained);
   Hashtbl.add benchmarks "set-batched" (module Vanilla_set.Batched);
   Hashtbl.add benchmarks "set-sequential" (module Vanilla_set.Sequential);
@@ -63,7 +63,7 @@ let run_benchmark (type a) (module B: BENCHMARK with type spec_args = a)
   Domainslib.Task.run pool (fun () ->
       Timing.time ~show_progress ~no_warmup ~no_iter ~init:(fun () -> B.init pool test) ~cleanup:(fun t -> B.cleanup t test)
         (fun t ->
-          B.run pool t test
+           B.run pool t test
         )
     )
 
