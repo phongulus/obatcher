@@ -10,5 +10,6 @@
   progress
   ; concurrent libraries
   domainslib
-  data)
+  data
+  datalog)
  (modes native))

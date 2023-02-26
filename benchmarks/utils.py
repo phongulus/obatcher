@@ -2,8 +2,9 @@ import subprocess
 import matplotlib.pyplot as plt
 from tqdm.notebook import tqdm
 
-def run_process(name, no_iters=5, count=1_000_000,
+def run_process(name, no_iters=5, count=1_000_000, 
                 domains=16,
+                no_warmup=None,
                 validate=False,
                 verbose=False,
                 init_count=None,
@@ -12,7 +13,9 @@ def run_process(name, no_iters=5, count=1_000_000,
                 search_threshold=None,
                 search_par_threshold=None,
                 insert_threshold=None,
-                branching_factor=None
+                branching_factor=None,
+                graph_nodes=None,
+                expensive_searches=None
                 ):
     cmd = ["../_build/default/benchmarks/bench.exe", name, "-D", str(domains), "--no-iter", str(no_iters), "--count", str(count)]
     if validate:
@@ -31,8 +34,14 @@ def run_process(name, no_iters=5, count=1_000_000,
         cmd += ["--insert-threshold", str(insert_threshold)]
     if branching_factor:
         cmd += ["--branching-factor", str(branching_factor)]
+    if graph_nodes:
+        cmd += ["--graph-nodes", str(graph_nodes)]
+    if expensive_searches:
+        cmd += ["--expensive-searches"]
+    if no_warmup:
+        cmd += ["--no-warmup", str(int(no_warmup))]
 
-    result = subprocess.run(cmd, capture_output=True)
+    result = subprocess.run(cmd, capture_output=True, check=True)
     stdout = result.stdout.decode("utf-8").splitlines()
     for output in stdout[:-1]:
         print(output)
@@ -42,7 +51,7 @@ def run_process(name, no_iters=5, count=1_000_000,
     if verbose:
         print(f"time for {name} with {count} inserts was {time} +- {var}")
     return float(time), float(var)
-
+ 
 def run_test(op, args):
     if isinstance(op, str):
         res = run_process(op, **args)
