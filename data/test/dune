@@ -1,9 +1,17 @@
-(executable (name finite_vector_tester)
+(executable
+ (name skiplist_tester)
+ (modules skiplist_tester)
+ (libraries data))
+
+(executable
+ (name finite_vector_tester)
  (modules finite_vector_tester)
  (libraries data))
 
-(executable (name btree_tester)
+(executable
+ (name btree_tester)
  (modules btree_tester)
  (libraries data))
 
-(cram (deps ./finite_vector_tester.exe ./btree_tester.exe))
+(cram
+ (deps ./finite_vector_tester.exe ./btree_tester.exe ./skiplist_tester.exe))

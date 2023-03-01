@@ -41,8 +41,7 @@ module Sequential = struct
 
   let spec_args: spec_args Cmdliner.Term.t = generic_spec_args
 
-  let test_spec ~initial_count ~count ~min ~max spec_args =
-    let _, _ , _ = initial_count, min, max in
+  let test_spec ~count spec_args =
     generic_test_spec ~count spec_args
 
   let init _pool _test_spec = Counter.init ()
@@ -56,6 +55,9 @@ module Sequential = struct
     for _ = 1 to test_spec.gets do
       ignore @@ Counter.get t
     done
+
+  let cleanup (_t: t) (_test_spec: test_spec) = ()
+
 end
 
 
@@ -69,8 +71,7 @@ module CoarseGrained = struct
 
   let spec_args: spec_args Cmdliner.Term.t = generic_spec_args
 
-  let test_spec ~initial_count ~count ~min ~max spec_args =
-    let _, _ , _ = initial_count, min, max in
+  let test_spec ~count spec_args =
     generic_test_spec ~count spec_args
 
   let init _pool _test_spec = 
@@ -79,7 +80,7 @@ module CoarseGrained = struct
   let run pool t test_spec =
     let total = test_spec.increments + test_spec.decrements + test_spec.gets in
     Domainslib.Task.parallel_for pool
-      ~start:1 ~finish:total
+      ~start:1 ~finish:total ~chunk_size:1
       ~body:(fun i ->
           Mutex.lock t.mutex;
           Fun.protect ~finally:(fun () -> Mutex.unlock t.mutex) (fun () ->
@@ -90,6 +91,9 @@ module CoarseGrained = struct
               else Counter.get t.counter |> ignore
             )
         )
+
+  let cleanup (_t: t) (_test_spec: test_spec) = ()
+
 end
 
 module Batched = struct
@@ -102,8 +106,7 @@ module Batched = struct
 
   let spec_args: spec_args Cmdliner.Term.t = generic_spec_args
 
-  let test_spec ~initial_count ~count ~min ~max spec_args =
-    let _, _ , _ = initial_count, min, max in
+  let test_spec ~count spec_args =
     generic_test_spec ~count spec_args
 
   let init pool _test_spec = BatchedCounter.init pool
@@ -111,7 +114,7 @@ module Batched = struct
   let run pool (counter: t) test_spec =
     let total = test_spec.increments + test_spec.decrements + test_spec.gets in
     Domainslib.Task.parallel_for pool
-      ~start:1 ~finish:total
+      ~start:1 ~finish:total ~chunk_size:1
       ~body:(fun i ->
           if i < test_spec.increments 
           then BatchedCounter.apply counter Incr
@@ -119,6 +122,8 @@ module Batched = struct
           then BatchedCounter.apply counter Decr
           else BatchedCounter.apply counter Get |> ignore
         )
+
+  let cleanup (_t: t) (_test_spec: test_spec) = ()
 
 end
 

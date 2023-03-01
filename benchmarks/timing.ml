@@ -10,7 +10,7 @@ let step ?(show_progress=false) ~name ~total f =
   end else f (fun _ -> ())
     
 
-let time ?show_progress ~no_warmup ~no_iter ~init f =
+let time ?show_progress ?(cleanup=fun _ -> ()) ~no_warmup ~no_iter ~init f =
 
   step ?show_progress ~name:"warmup" ~total:no_warmup (fun prog ->
     for _ = 1 to no_warmup do let state = init () in f state; prog 1 done;
@@ -33,6 +33,8 @@ let time ?show_progress ~no_warmup ~no_iter ~init f =
       f state;
       let end_time = Ptime_clock.now () in
       let time = Ptime.Span.to_float_s (Ptime.diff end_time start_time) in
+
+      cleanup state;
 
       sum := !sum +. time;
       sum_sq := !sum_sq +. (time *. time);
@@ -58,4 +60,5 @@ let time ?show_progress ~no_warmup ~no_iter ~init f =
 
   if !count <= 2.0
   then Format.printf "%.5fs ± %.5fs\n%!" avg_time sd
-  else Format.printf "%.5fs ± %.5fs\n%!" mean sample_sd
+  else Format.printf "%.5fs ± %.5fs\n%!" mean sample_sd;
+  

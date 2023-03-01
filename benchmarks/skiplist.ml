@@ -1,5 +1,7 @@
 module IntSkiplist = Data.Skiplist.Make(Int)
 module BatchedSkiplist = Domainslib.Batcher.Make(Data.Skiplist.Make(Int))
+module ExplicitlyBatchedSkiplist = Data.Skiplist.Make(Int)
+module LazySkiplist = Data.Lazy_slist.Make(struct include Int let hash t = t end)
 
 type generic_test_spec = {
   initial_elements: (unit -> int array);
@@ -11,7 +13,10 @@ type generic_test_spec = {
 type generic_spec_args = {
   sorted : bool;
   no_searches : int;
-  no_size : int
+  no_size : int;
+  initial_count: int;
+  min: int;
+  max: int;
 }
 
 let generic_spec_args: generic_spec_args Cmdliner.Term.t =
@@ -21,9 +26,24 @@ let generic_spec_args: generic_spec_args Cmdliner.Term.t =
     Arg.(value @@ opt (some int) None @@ info ~doc:"number of searches" ~docv:"NO_SEARCHES" ["n"; "no-searches"]) in
   let no_size = 
     Arg.(value @@ opt (some int) None @@ info ~doc:"number of size operation calls" ~docv:"NO_SIZE" ["n_sz"; "no-size"]) in
-  Term.(const (fun sorted no_searches no_size -> {sorted; no_searches=Option.value ~default:0 no_searches; no_size=Option.value ~default:0 no_size}) $ sorted $ no_searches $ no_size)
+  let initial_count =
+    Arg.(value @@ opt (some int) None @@ info ~doc:"Initial number of operations" ["init-count"]) in
+  let min =
+    Arg.(value @@ opt (some int) None @@ info ~doc:"Minimum value of data for random inputs" ["min"]) in
+  let max =
+    Arg.(value @@ opt (some int) None @@ info ~doc:"Maximum value of data for random inputs" ["max"]) in
+  Term.(const (fun sorted no_searches no_size initial_count min max ->
+    {
+      sorted;
+      no_searches=Option.value ~default:0 no_searches;
+      no_size=Option.value ~default:0 no_size;
+      initial_count=Option.value ~default:0 initial_count;
+      min=Option.value ~default:0 min;
+      max=Option.value ~default:((Int.shift_left 1 30) - 1) max;
+    }) $ sorted $ no_searches $ no_size $ initial_count $ min $ max)
 
-let generic_test_spec ~initial_count ~count ~min ~max spec_args =
+let generic_test_spec ~count spec_args =
+  let {min;max;initial_count;_} = spec_args in
   let initial_elements () = Util.gen_random_array ~min ~max initial_count in
   let insert_elements = Util.gen_random_array ~min ~max count in
   let search_elements = Util.gen_random_array ~min ~max spec_args.no_searches in
@@ -41,8 +61,8 @@ module Sequential = struct
 
   let spec_args: spec_args Cmdliner.Term.t = generic_spec_args
 
-  let test_spec ~initial_count ~count ~min ~max spec_args =
-    generic_test_spec ~initial_count ~count ~min ~max spec_args
+  let test_spec ~count spec_args =
+    generic_test_spec ~count spec_args
 
   let init _pool test_spec = 
     let initial_elements = test_spec.initial_elements () in
@@ -59,6 +79,9 @@ module Sequential = struct
     for _ = 1 to test_spec.size do
       IntSkiplist.Sequential.size t |> ignore
     done
+
+  let cleanup (_t: t) (_test_spec: test_spec) = ()
+
 end
 
 
@@ -73,8 +96,8 @@ module CoarseGrained = struct
 
   let spec_args: spec_args Cmdliner.Term.t = generic_spec_args
 
-  let test_spec ~initial_count ~count ~min ~max spec_args =
-    generic_test_spec ~initial_count ~count ~min ~max spec_args
+  let test_spec ~count spec_args =
+    generic_test_spec ~count spec_args
 
   let init _pool test_spec = 
     let initial_elements = test_spec.initial_elements () in
@@ -86,7 +109,7 @@ module CoarseGrained = struct
   let run pool t test_spec =
     let total = Array.length test_spec.insert_elements + Array.length test_spec.search_elements + test_spec.size - 1 in
     Domainslib.Task.parallel_for pool
-      ~start:0 ~finish:total
+      ~start:0 ~finish:total ~chunk_size:1
       ~body:(fun i ->
           Mutex.lock t.mutex;
           Fun.protect ~finally:(fun () -> Mutex.unlock t.mutex) (fun () ->
@@ -94,11 +117,14 @@ module CoarseGrained = struct
               then IntSkiplist.Sequential.insert t.skiplist test_spec.insert_elements.(i)
               else if i < Array.length test_spec.insert_elements + Array.length test_spec.search_elements then
                 ignore (IntSkiplist.Sequential.mem t.skiplist
-                          test_spec.search_elements.(i - Array.length test_spec.search_elements))
+                          test_spec.search_elements.(i - Array.length test_spec.insert_elements))
               else
                 ignore (IntSkiplist.Sequential.size t.skiplist)
             )
         )
+
+  let cleanup (_t: t) (_test_spec: test_spec) = ()
+
 end
 
 module Batched = struct
@@ -111,8 +137,8 @@ module Batched = struct
 
   let spec_args: spec_args Cmdliner.Term.t = generic_spec_args
 
-  let test_spec ~initial_count ~count ~min ~max spec_args =
-    generic_test_spec ~initial_count ~count ~min ~max spec_args
+  let test_spec ~count spec_args =
+    generic_test_spec ~count spec_args
 
   let init pool test_spec = 
     let initial_elements = test_spec.initial_elements () in
@@ -123,16 +149,82 @@ module Batched = struct
   let run pool t test_spec =
     let total = Array.length test_spec.insert_elements + Array.length test_spec.search_elements + test_spec.size - 1 in
     Domainslib.Task.parallel_for pool
-      ~start:0 ~finish:total
+      ~start:0 ~finish:total ~chunk_size:1
       ~body:(fun i ->
           if i < Array.length test_spec.insert_elements
           then BatchedSkiplist.apply t (Insert test_spec.insert_elements.(i))
           else if i < Array.length test_spec.insert_elements + Array.length test_spec.search_elements then
             ignore (BatchedSkiplist.apply t 
-                      (Member test_spec.search_elements.(i - Array.length test_spec.search_elements)))
+                      (Member test_spec.search_elements.(i - Array.length test_spec.insert_elements)))
           else
             ignore (BatchedSkiplist.apply t Size)
         )
 
+  let cleanup (_t: t) (_test_spec: test_spec) = ()
+
+end
+
+module ExplicitBatched = struct
+
+  type t = ExplicitlyBatchedSkiplist.t
+
+  type test_spec = generic_test_spec
+
+  type spec_args = generic_spec_args
+
+  let spec_args: spec_args Cmdliner.Term.t = generic_spec_args
+
+  let test_spec ~count spec_args =
+    generic_test_spec ~count spec_args
+
+  let init _pool test_spec = 
+    let initial_elements = test_spec.initial_elements () in
+    let skiplist = ExplicitlyBatchedSkiplist.init () in
+    Array.iter (fun i -> ExplicitlyBatchedSkiplist.Sequential.insert skiplist i) initial_elements;
+    skiplist
+
+  let run pool t test_spec =
+    ExplicitlyBatchedSkiplist.par_insert t pool test_spec.insert_elements;
+    if test_spec.size > 0 then ignore @@ ExplicitlyBatchedSkiplist.par_size t pool (Array.make test_spec.size 0);
+    ignore @@ ExplicitlyBatchedSkiplist.par_search t pool test_spec.search_elements
+
+  let cleanup (_t: t) (_test_spec: test_spec) = ()
+
+end
+
+
+module Lazy = struct
+  
+  type t = LazySkiplist.Node.t
+             
+  type test_spec = generic_test_spec
+    
+  type spec_args = generic_spec_args
+    
+  let spec_args : spec_args Cmdliner.Term.t = generic_spec_args
+
+  let test_spec ~count spec_args =
+    generic_test_spec ~count spec_args
+
+  let init _pool test_spec =
+    let initial_elements = test_spec.initial_elements () in
+    LazySkiplist.init ();
+    Array.iter (fun i -> ignore @@ LazySkiplist.add i) initial_elements;
+    LazySkiplist.Node.Null
+      
+  let run pool _t test_spec =
+    let total = Array.length test_spec.insert_elements + Array.length test_spec.search_elements + test_spec.size - 1 in
+    Domainslib.Task.parallel_for pool
+      ~start:0 ~finish:total ~chunk_size:1
+      ~body:(fun i ->
+          if i < Array.length test_spec.insert_elements
+          then ignore @@ LazySkiplist.add test_spec.insert_elements.(i)
+          else if i < Array.length test_spec.insert_elements + Array.length test_spec.search_elements then
+            ignore (LazySkiplist.contains test_spec.search_elements.(i - Array.length test_spec.insert_elements))
+          else
+            ignore (LazySkiplist.size ())
+        )
+
+  let cleanup (_t: t) (_test_spec: test_spec) = ()
 end
 

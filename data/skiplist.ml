@@ -139,6 +139,25 @@ module Make (V : Stdlib.Map.OrderedType) = struct
       let first_val = !^starting_point.value in
       walk first_val !>starting_point.(0)
 
+    let print_slist t to_string =
+      let print_level t lvl =
+        let rec aux = function
+          | Null -> print_endline "Null"
+          | Hd forward ->
+            Printf.printf "Level %d : Hd -> " lvl;
+            aux forward.(lvl)
+          | Node {value; forward; _} ->
+            let val_str = to_string value in
+            Printf.printf "(%s) -> " val_str;
+            aux forward.(lvl)
+        in
+        aux t.hdr
+      in
+      for lvl = !(t.level) downto 0 do
+        print_level t lvl;
+        Printf.printf "\n"
+      done
+
   end
 
   type t = Sequential.t
@@ -150,7 +169,7 @@ module Make (V : Stdlib.Map.OrderedType) = struct
 
   type wrapped_op = Mk : 'a op * ('a -> unit) -> wrapped_op
 
-  let init () = Sequential.init ~size:10 ()
+  let init () = Sequential.init ~size:((Int.shift_left 1 30) - 1) ()
 
   type intermediate = {
     batch_size : int;
@@ -262,7 +281,7 @@ module Make (V : Stdlib.Map.OrderedType) = struct
   let par_insert t (pool : Domainslib.Task.pool) (elems : V.t array) =
     let open Sequential in
     (* Sort in acscending order *)
-    Array.sort V.compare elems;
+    Sort.sort pool ~compare:V.compare elems;
     let num_elems = remove_duplicates elems (Array.length elems) in
 
     let intermediary = {
@@ -295,23 +314,35 @@ module Make (V : Stdlib.Map.OrderedType) = struct
       done;
     done
 
+  let par_search t (pool : Domainslib.Task.pool) (elems : V.t array) : bool array =
+    let result_arr = Array.make (Array.length elems) false in
+    Domainslib.Task.parallel_for pool ~start:0 ~finish:((Array.length elems) - 1)
+      ~body:(fun i -> result_arr.(i) <- Sequential.mem t elems.(i));
+    result_arr
+
+  let par_size t (pool : Domainslib.Task.pool) (elems : int array) : int array =
+    let size = Sequential.size t in
+    Domainslib.Task.parallel_for pool ~start:0 ~finish:((Array.length elems) - 1)
+      ~body:(fun i -> elems.(i) <- size);
+    elems
+
   let run t (pool: Domainslib.Task.pool) (ops: wrapped_op array) : unit =
     let inserts: V.t list ref = ref [] in
     let searches: (V.t * (bool -> unit)) list ref = ref [] in
     let size = lazy (Sequential.size t) in
     Array.iter (function
-      | Mk (Size, kont) -> kont (Lazy.force size)
-      | Mk (Member vl, kont) -> searches := (vl,kont) :: !searches
-      | Mk (Insert vl, kont) -> kont (); inserts := vl :: !inserts
-    ) ops;
+        | Mk (Size, kont) -> kont (Lazy.force size)
+        | Mk (Member vl, kont) -> searches := (vl,kont) :: !searches
+        | Mk (Insert vl, kont) -> kont (); inserts := vl :: !inserts
+      ) ops;
     (* now, do all searches in parallel *)
     let searches = Array.of_list !searches in
     Domainslib.Task.parallel_for pool ~start:0 ~finish:(Array.length searches - 1)
       ~body:(fun i ->
-        let key, kont = searches.(i) in
-        let result = Sequential.mem t key in
-        kont result
-      );
+          let key, kont = searches.(i) in
+          let result = Sequential.mem t key in
+          kont result
+        );
     (* now, all inserts *)
     let inserts = Array.of_list !inserts in
     par_insert t pool inserts

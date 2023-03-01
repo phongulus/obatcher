@@ -1,10 +1,15 @@
-(executable (name bench)
+(executable
+ (name bench)
  (libraries
-   ; command line parsing
-   cmdliner
-   ; timing
-   ptime ptime.clock.os
-   ; progress bars
-   progress
-   ; concurrent libraries
-   domainslib data))
+  ; command line parsing
+  cmdliner
+  ; timing
+  ptime
+  ptime.clock.os
+  ; progress bars
+  progress
+  ; concurrent libraries
+  domainslib
+  data
+  datalog)
+ (modes native))
