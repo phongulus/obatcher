@@ -7,7 +7,7 @@ let gen_random_unique_array ~min ~max count =
   | _ when min < 0 -> failwith "min cannot be less than 0"
   | _ when max > max_rdm_int ->  
     let s = Format.sprintf "max cannot be greater than %d" max_rdm_int in failwith s
-  | _ -> ();
+  | _ -> 
     let seen_ints = ref IntSet.empty in
     let rec fresh_int s =
       let vl = min + Random.int (max - min) in

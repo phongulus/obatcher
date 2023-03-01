@@ -3,3 +3,4 @@ _build
 .merlin
 .ipynb_checkpoints/
 __pycache__/
+*.csv

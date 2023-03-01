@@ -38,7 +38,11 @@ let () =
       | domains_count :: _ -> int_of_string domains_count
     [@@alert "-unstable"] in
     let pool = Domainslib.Task.setup_pool ~num_domains:num_domains () in
-    let results = Btree.par_search ~pool tree keys in
+    let results = Array.make (Array.length keys) None in
+    begin Domainslib.Task.run pool @@ fun () ->
+      Btree.par_search ~pool tree
+        (Array.mapi (fun i k -> (k, fun res -> results.(i) <- res)) keys)
+    end;
     for i = 0 to Array.length results - 1 do
       begin match results.(i) with
         | None -> print_endline (string_of_int keys.(i) ^ " ==> None")
@@ -65,7 +69,9 @@ let () =
       | domains_count :: _ -> int_of_string domains_count
     [@@alert "-unstable"] in
     let pool = Domainslib.Task.setup_pool ~num_domains:num_domains () in
-    let btree = Btree.Sequential.{root=Btree.build_from_sorted ~pool ~max_children keys_vals; max_children} in
+    let height,root = Domainslib.Task.run pool @@ fun () ->
+      Btree.build_from_sorted ~pool ~max_children keys_vals in
+    let btree = Btree.Sequential.{root;height;max_children} in
     dump_btree fname btree;
     print_btree btree;
     Domainslib.Task.teardown_pool pool

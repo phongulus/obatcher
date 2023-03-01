@@ -42,6 +42,7 @@ module Make (S : S) = struct
       running = Atomic.make false;
       container = Ts_container.create () }
 
+
   let rec try_launch t =
     if Ts_container.size t.container > 0 
     && Atomic.compare_and_set t.running false true 
@@ -51,6 +52,17 @@ module Make (S : S) = struct
         S.run t.ds t.pool batch;
         Atomic.set t.running false;
         try_launch t
+      end
+
+  let try_launch t =
+    if Ts_container.size t.container > 0 
+    && Atomic.compare_and_set t.running false true 
+    then
+      begin
+        let batch = Ts_container.get t.container in
+        S.run t.ds t.pool batch;
+        Atomic.set t.running false;
+        ignore @@ Task.async t.pool (fun () -> try_launch t)
       end
 
   let apply t op =
@@ -93,6 +105,17 @@ module Make1 (S : S1) = struct
         S.run t.ds t.pool batch;
         Atomic.set t.running false;
         try_launch t
+      end
+
+  let try_launch t =
+    if Ts_container.size t.container > 0 
+    && Atomic.compare_and_set t.running false true 
+    then
+      begin
+        let batch = Ts_container.get t.container in
+        S.run t.ds t.pool batch;
+        Atomic.set t.running false;
+        ignore @@ Task.async t.pool (fun () -> try_launch t)
       end
 
   let apply t op =

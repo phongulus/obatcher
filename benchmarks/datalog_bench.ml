@@ -18,6 +18,40 @@ let with_graph_db f =
   f db
 
 
+
+module BatchedBasicDatalog = struct
+  type t = Datalog.db
+  type _ op =
+    | Search : Datalog.literal -> bool op
+    | Insert : Datalog.literal -> unit op
+
+  type wrapped_op = Mk: 'a op * ('a -> unit) -> wrapped_op
+
+  let init () =
+    with_graph_db (fun db -> db)
+
+  let run (t: t) (_pool: Domainslib.Task.pool) (batch: wrapped_op array) : unit =
+    let searches : (Datalog.literal * (bool -> unit)) list ref = ref []
+    and inserts : Datalog.literal list ref  = ref [] in
+    Array.iter (function
+        Mk (Search lit, kont) -> searches := (lit,kont) :: !searches
+      | Mk (Insert clause, kont) -> kont (); inserts := (clause) :: !inserts
+    ) batch;
+    let searches = Array.of_list !searches in
+    Array.iter  (fun (clause, kont) ->
+      let res = ref false in
+      Datalog.db_match t clause
+        (fun _ -> res := true);
+      kont !res
+    ) searches;
+    let inserts = Array.of_list !inserts in
+    Array.iter (fun e ->
+      Datalog.db_add_fact t e
+    ) inserts
+
+end
+
+
 module BatchedDatalog = struct
   type t = Datalog.db
   type _ op =
@@ -54,6 +88,7 @@ module BatchedDatalog = struct
 end
 
 module ConcurrentDatalog = Domainslib.Batcher.Make (BatchedDatalog)
+module ConcurrentBasicDatalog = Domainslib.Batcher.Make (BatchedBasicDatalog)
 
 type generic_spec_args = {
   no_searches: int;
@@ -104,9 +139,7 @@ let generic_test_spec ~count spec_args =
   }
 
 let generic_init test_spec =
-  Random.set_state (Random.State.make [| 0 |]);
   let spec_args = test_spec.args in
-  let seen_edges :((int * int), unit) Hashtbl.t = Hashtbl.create (spec_args.graph_nodes * 100) in
   let node_to_symbol i  = "e" ^ string_of_int i in
   let node_to_term i  = Datalog.mk_const (node_to_symbol i) in
   let edge_to_literal (t1, t2)  = Datalog.mk_literal "edge" [node_to_term t1; node_to_term t2] in
@@ -119,18 +152,33 @@ let generic_init test_spec =
     let i2 = Random.int (spec_args.graph_nodes + 1) in
     let edge = (i1, i2) in
     edge in
-  let rec fresh_edge () =
-    let edge = random_edge () in
-    if Hashtbl.mem seen_edges edge
-    then fresh_edge ()
-    else (Hashtbl.add seen_edges edge (); edge_to_literal edge) in
+  if test_spec.args.graph_nodes < 1_000_000 then begin
+    let n = test_spec.args.graph_nodes in
+    let edges = Array.init (n * n) (fun i ->
+      (Random.int (n * n), (i / n, i mod n))
+    ) in
+    Array.sort (fun (k, _) (k', _) -> Int.compare k k') edges;
+    test_spec.initial_elements <-
+      Array.init spec_args.initial_count
+        (fun i -> edge_to_literal (snd edges.(i)));
 
-  test_spec.initial_elements <-
-    Array.init spec_args.initial_count (fun _ -> fresh_edge ());
+    test_spec.insert_elements <-
+      Array.init test_spec.count
+        (fun i -> edge_to_literal (snd edges.(spec_args.initial_count + i)));
+  end else begin
+    let seen_edges :((int * int), unit) Hashtbl.t = Hashtbl.create (spec_args.graph_nodes * 100) in
+    let rec fresh_edge () =
+      let edge = random_edge () in
+      if Hashtbl.mem seen_edges edge
+      then fresh_edge ()
+      else (Hashtbl.add seen_edges edge (); edge_to_literal edge) in
 
-  test_spec.insert_elements <-
-    Array.init test_spec.count (fun _ -> fresh_edge ());
+    test_spec.initial_elements <-
+      Array.init spec_args.initial_count (fun _ -> fresh_edge ());
 
+    test_spec.insert_elements <-
+      Array.init test_spec.count (fun _ -> fresh_edge ());
+  end;
   test_spec.search_elements <-
     Array.init spec_args.no_searches (fun _ -> edge_to_connected_literal (random_edge ()))
 
@@ -259,5 +307,40 @@ module BatchParallel = struct
   let cleanup _ _ = ()
 
 end
+
+module BatchParallelBasic = struct
+
+  type t = ConcurrentBasicDatalog.t
+
+  type test_spec = generic_test_spec
+  type spec_args = generic_spec_args
+
+  let spec_args = generic_spec_args
+  let test_spec ~count spec_args =
+    generic_test_spec ~count spec_args
+
+  let init pool spec =
+    generic_init spec;
+    let t = ConcurrentBasicDatalog.init pool in
+    Array.iter (fun lit ->
+      ConcurrentBasicDatalog.apply t (BatchedBasicDatalog.Insert lit)
+    ) spec.initial_elements;
+    t
+
+  let run pool (t: t) test_spec =
+    Domainslib.Task.parallel_for pool ~chunk_size:1
+      ~start:0 ~finish:(Array.length test_spec.insert_elements + Array.length test_spec.search_elements - 1)
+      ~body:(fun i ->
+        if i < Array.length test_spec.insert_elements
+        then ConcurrentBasicDatalog.apply t (Insert test_spec.insert_elements.(i))
+        else ignore (
+          ignore @@
+          ConcurrentBasicDatalog.apply t (Search test_spec.search_elements.(i - Array.length test_spec.insert_elements)))
+      )
+
+  let cleanup _ _ = ()
+
+end
+
 
 
