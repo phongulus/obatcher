@@ -3,6 +3,7 @@ module IntSet = Set.Make(Int)
 module IntBtree = Data.Btree.Make(Int)
 module BatchedIntBtree = Domainslib.Batcher.Make1(IntBtree)
 
+
 module type BENCHMARK = sig
 
   type t
@@ -60,7 +61,8 @@ let () =
 
   Hashtbl.add benchmarks "datalog-sequential" (module Datalog_bench.Sequential);
   Hashtbl.add benchmarks "datalog-coarse" (module Datalog_bench.CoarseGrained);
-  Hashtbl.add benchmarks "datalog-batched" (module Datalog_bench.BatchParallel)
+  Hashtbl.add benchmarks "datalog-batched" (module Datalog_bench.BatchParallel);
+  Hashtbl.add benchmarks "datalog-non-parallel-batched" (module Datalog_bench.BatchParallelBasic)
 
 
 
