@@ -1,5 +1,6 @@
 [@@@warning "-32-26"]
 let avltree_insert_sequential_threshold = ref 100
+let avltree_insert_height_threshold = ref 100
 let avltree_search_sequential_threshold = ref 1
 let avltree_search_height_threshold = ref 1
 
@@ -383,7 +384,38 @@ module Make (V: Map.OrderedType) = struct
     Sort.sort pool ~compare:(fun (k, _) (k', _) -> V.compare k k') keys;
     par_search_aux threshold pool t ~keys ~range:(0, Array.length keys) *)
 
-  let rec par_insert_aux threshold ~pool (t: 'a t) ~inserts ~range:(rstart, rstop) =
+  let rec par_insert_aux op_threshold height_threshold ~pool (t: 'a t) ~inserts ~range:(rstart, rstop) =
+    let n = rstop - rstart in
+    if n <= 0 then ()
+    else if n <= op_threshold || Sequential.height (Sequential.root_node t) <= height_threshold then
+      for i = rstart to rstop - 1 do
+        let (k, v) = inserts.(i) in
+        Sequential.insert k v t
+      done
+    else
+      let (ln, mn, rn) = Sequential.expose @@ Sequential.root_node t in
+      let lt = {Sequential.root = ln} and rt = {Sequential.root = rn} in
+      let k = Sequential.key mn in
+      let (split, _) = binary_search inserts k rstart rstop in
+      let s1 = ref split and s2 = ref split in
+      while !s1 > rstart && fst inserts.(!s1 - 1) = k do s1 := !s1 - 1 done;
+      while fst inserts.(!s2) = k && !s2 >= rstop do s2 := !s2 + 1 done;
+      let l = Domainslib.Task.async pool 
+        (fun () -> par_insert_aux op_threshold height_threshold ~pool lt ~inserts ~range:(rstart, !s1)) in
+      let r = Domainslib.Task.async pool
+        (fun () -> par_insert_aux op_threshold height_threshold ~pool rt ~inserts ~range:(!s2, rstop)) in
+      Domainslib.Task.await pool l; Domainslib.Task.await pool r;
+      let nt = Sequential.join lt mn rt in
+      t.root <- nt.root
+
+  let par_insert ?op_threshold ?height_threshold ~pool (t: 'a t) inserts =
+    let op_threshold = match op_threshold with Some t -> t | None -> !avltree_insert_sequential_threshold in
+    let height_threshold = match height_threshold with Some t -> t | None -> !avltree_insert_height_threshold in
+    Sort.sort pool ~compare:(fun (k, _) (k', _) -> V.compare k k') inserts;
+    par_insert_aux op_threshold height_threshold ~pool t ~inserts ~range:(0, Array.length inserts)
+
+  (* Split cleanly down the middle of the insertion array *)
+  (* let rec par_insert_aux threshold ~pool (t: 'a t) ~inserts ~range:(rstart, rstop) =
     let n = rstop - rstart in
     if n <= 0 then ()
     else if n <= threshold then
@@ -411,7 +443,7 @@ module Make (V: Map.OrderedType) = struct
   let par_insert ?threshold ~pool (t: 'a t) inserts =
     let threshold = match threshold with Some t -> t | None -> !avltree_insert_sequential_threshold in
     Sort.sort pool ~compare:(fun (k, _) (k', _) -> V.compare k k') inserts;
-    par_insert_aux threshold ~pool t ~inserts ~range:(0, Array.length inserts)
+    par_insert_aux threshold ~pool t ~inserts ~range:(0, Array.length inserts) *)
 
   let run (type a) (t: a t) (pool: Domainslib.Task.pool) (ops: a wrapped_op array) =
     let searches: (V.t * (a option -> unit)) list ref = ref [] in
