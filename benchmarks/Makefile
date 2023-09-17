@@ -71,7 +71,7 @@ skiplist : skiplist.ml
 	$(B) skiplist-lazy --init-count=$(S_PRESET) --count=$(S_INS) -i $(ITER) --no-searches=$(S_SEARCH) --no-size=$(S_SIZE) -w $(WARMUP) -D 7
 	$(B) skiplist-lazy --init-count=$(S_PRESET) --count=$(S_INS) -i $(ITER) --no-searches=$(S_SEARCH) --no-size=$(S_SIZE) -w $(WARMUP) -D 8
 
-B_PRESET := 0
+B_PRESET := 2_000_000
 B_OPS := 1_000_000
 btree : btree.ml
 	printf "Btree-Sequential\n"
@@ -128,3 +128,55 @@ skiplist_explicit :
 	$(B) skiplist-explicit --init-count=$(S_PRESET) --count=$(S_INS) -i $(ITER) --no-searches=$(S_SEARCH) --no-size=$(S_SIZE) -w $(WARMUP) -D 6
 	$(B) skiplist-explicit --init-count=$(S_PRESET) --count=$(S_INS) -i $(ITER) --no-searches=$(S_SEARCH) --no-size=$(S_SIZE) -w $(WARMUP) -D 7
 	$(B) skiplist-explicit --init-count=$(S_PRESET) --count=$(S_INS) -i $(ITER) --no-searches=$(S_SEARCH) --no-size=$(S_SIZE) -w $(WARMUP) -D 8
+
+RB_PRESET := 2_000_000
+RB_OPS := 1_000_000
+rbtree : rbtree.ml
+	printf "Rbtree-Sequential\n"
+	$(B) rbtree-sequential --init-count=$(RB_PRESET) --count=$(RB_OPS) -i $(ITER) -w $(WARMUP)
+
+	printf "Rbtree-Batched\n"
+	$(B) rbtree-batched --init-count=$(RB_PRESET) --count=$(RB_OPS) -i $(ITER) -w $(WARMUP) -D 1
+	$(B) rbtree-batched --init-count=$(RB_PRESET) --count=$(RB_OPS) -i $(ITER) -w $(WARMUP) -D 2
+	$(B) rbtree-batched --init-count=$(RB_PRESET) --count=$(RB_OPS) -i $(ITER) -w $(WARMUP) -D 3
+	$(B) rbtree-batched --init-count=$(RB_PRESET) --count=$(RB_OPS) -i $(ITER) -w $(WARMUP) -D 4
+	$(B) rbtree-batched --init-count=$(RB_PRESET) --count=$(RB_OPS) -i $(ITER) -w $(WARMUP) -D 5
+	$(B) rbtree-batched --init-count=$(RB_PRESET) --count=$(RB_OPS) -i $(ITER) -w $(WARMUP) -D 6
+	$(B) rbtree-batched --init-count=$(RB_PRESET) --count=$(RB_OPS) -i $(ITER) -w $(WARMUP) -D 7
+	$(B) rbtree-batched --init-count=$(RB_PRESET) --count=$(RB_OPS) -i $(ITER) -w $(WARMUP) -D 8
+
+rbtree_batched :
+	$(B) rbtree-batched --init-count=$(RB_PRESET) --count=$(RB_OPS) -i $(ITER) -w $(WARMUP) -D 1
+	$(B) rbtree-batched --init-count=$(RB_PRESET) --count=$(RB_OPS) -i $(ITER) -w $(WARMUP) -D 2
+	$(B) rbtree-batched --init-count=$(RB_PRESET) --count=$(RB_OPS) -i $(ITER) -w $(WARMUP) -D 3
+	$(B) rbtree-batched --init-count=$(RB_PRESET) --count=$(RB_OPS) -i $(ITER) -w $(WARMUP) -D 4
+	$(B) rbtree-batched --init-count=$(RB_PRESET) --count=$(RB_OPS) -i $(ITER) -w $(WARMUP) -D 5
+	$(B) rbtree-batched --init-count=$(RB_PRESET) --count=$(RB_OPS) -i $(ITER) -w $(WARMUP) -D 6
+	$(B) rbtree-batched --init-count=$(RB_PRESET) --count=$(RB_OPS) -i $(ITER) -w $(WARMUP) -D 7
+	$(B) rbtree-batched --init-count=$(RB_PRESET) --count=$(RB_OPS) -i $(ITER) -w $(WARMUP) -D 8
+
+AVL_PRESET := 2_000_000
+AVL_OPS := 1_000_000
+avltree : avltree.ml
+	printf "Avltree-Sequential\n"
+	$(B) avltree-sequential --init-count=$(AVL_PRESET) --count=$(AVL_OPS) -i $(ITER) -w $(WARMUP)
+
+	printf "Avltree-Batched\n"
+	$(B) avltree-batched --init-count=$(AVL_PRESET) --count=$(AVL_OPS) -i $(ITER) -w $(WARMUP) -D 1
+	$(B) avltree-batched --init-count=$(AVL_PRESET) --count=$(AVL_OPS) -i $(ITER) -w $(WARMUP) -D 2
+	$(B) avltree-batched --init-count=$(AVL_PRESET) --count=$(AVL_OPS) -i $(ITER) -w $(WARMUP) -D 3
+	$(B) avltree-batched --init-count=$(AVL_PRESET) --count=$(AVL_OPS) -i $(ITER) -w $(WARMUP) -D 4
+	$(B) avltree-batched --init-count=$(AVL_PRESET) --count=$(AVL_OPS) -i $(ITER) -w $(WARMUP) -D 5
+	$(B) avltree-batched --init-count=$(AVL_PRESET) --count=$(AVL_OPS) -i $(ITER) -w $(WARMUP) -D 6
+	$(B) avltree-batched --init-count=$(AVL_PRESET) --count=$(AVL_OPS) -i $(ITER) -w $(WARMUP) -D 7
+	$(B) avltree-batched --init-count=$(AVL_PRESET) --count=$(AVL_OPS) -i $(ITER) -w $(WARMUP) -D 8
+
+avltree_batched :
+	$(B) avltree-batched --init-count=$(AVL_PRESET) --count=$(AVL_OPS) -i $(ITER) -w $(WARMUP) -D 1
+	$(B) avltree-batched --init-count=$(AVL_PRESET) --count=$(AVL_OPS) -i $(ITER) -w $(WARMUP) -D 2
+	$(B) avltree-batched --init-count=$(AVL_PRESET) --count=$(AVL_OPS) -i $(ITER) -w $(WARMUP) -D 3
+	$(B) avltree-batched --init-count=$(AVL_PRESET) --count=$(AVL_OPS) -i $(ITER) -w $(WARMUP) -D 4
+	$(B) avltree-batched --init-count=$(AVL_PRESET) --count=$(AVL_OPS) -i $(ITER) -w $(WARMUP) -D 5
+	$(B) avltree-batched --init-count=$(AVL_PRESET) --count=$(AVL_OPS) -i $(ITER) -w $(WARMUP) -D 6
+	$(B) avltree-batched --init-count=$(AVL_PRESET) --count=$(AVL_OPS) -i $(ITER) -w $(WARMUP) -D 7
+	$(B) avltree-batched --init-count=$(AVL_PRESET) --count=$(AVL_OPS) -i $(ITER) -w $(WARMUP) -D 8
