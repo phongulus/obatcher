@@ -1,8 +1,11 @@
 [@@@warning "-32-26"]
 let avltree_insert_sequential_threshold = ref 128
 let avltree_insert_height_threshold = ref 7
-let avltree_search_sequential_threshold = ref 32
-let avltree_search_height_threshold = ref 5
+let avltree_search_sequential_threshold = ref 30
+let avltree_search_height_threshold = ref 4
+
+(* let avltree_search_sequential_threshold = ref 1
+let avltree_search_height_threshold = ref 0 *)
 
 module Make (V: Map.OrderedType) = struct
   module Sequential = struct
@@ -294,7 +297,7 @@ module Make (V: Map.OrderedType) = struct
     if left > right then
       match fst arr.(left) with
       | key when key >= target -> left
-      | _ -> raise Not_found (* No element greater than or equal to the target *)
+      | _ -> 0 (* No element greater than or equal to the target *)
     else
       let mid = (left + right) / 2 in
       match fst arr.(mid) with
@@ -302,13 +305,97 @@ module Make (V: Map.OrderedType) = struct
       | key when key < target -> binary_search arr target (mid + 1) right
       | _ -> binary_search arr target left (mid - 1)
 
-  let rec par_search_aux op_threshold height_threshold ~pool (t: 'a t) ~keys ~range:(rstart, rstop) =
+  let binary_search arr target left right =
+    let left = ref left and right = ref right in
+    let mid = ref @@ (!left + !right) / 2 in
+    let found = ref false in
+    while !left <= !right && not !found do
+      mid := (!left + !right) / 2;
+      let ck = fst arr.(!mid) in
+      if ck = target then found := true
+      else if ck < target then left := !mid + 1
+      else right := !mid - 1
+    done;
+    if !found then !mid
+    else if fst arr.(!left) >= target then !left
+    else 0
+    
+    (* if left > right then
+      match fst arr.(left) with
+      | key when key >= target -> left
+      | _ -> 0 (* No element greater than or equal to the target *)
+    else
+      let mid = (left + right) / 2 in
+      match fst arr.(mid) with
+      | key when key = target -> mid (* Found the target element *)
+      | key when key < target -> binary_search arr target (mid + 1) right
+      | _ -> binary_search arr target left (mid - 1) *)
+
+  let rec par_search_aux op_threshold height_threshold ~pool node ~keys ~range:(rstart, rstop) =
+    let n = rstop - rstart in
+    if n <= 0 then ()
+    else if node = Sequential.Leaf then
+      for i = rstart to rstop - 1 do let (_,kont) = keys.(i) in kont None done
+    (* else if n <= op_threshold || Sequential.height node <= height_threshold then *)
+    else if n <= op_threshold then
+      for i = rstart to rstop - 1 do let (k,kont) = keys.(i) in kont @@ Sequential.search_aux k node done 
+      (* Domainslib.Task.parallel_for pool ~start:rstart ~finish:(rstop - 1) ~body:(fun i ->
+        let (k,kont) = keys.(i) in
+        kont @@ Sequential.search_aux k node) *)
+    else
+      let k = Sequential.key node in
+      let nval = Sequential.nval node in
+      let s1 = ref rstart and s2 = ref rstart in
+      if n > 200 then begin
+        let split = binary_search keys k rstart rstop in
+        s1 := split; s2 := split;
+        while !s1 > rstart && fst keys.(!s1 - 1) = k do
+          s1 := !s1 - 1;
+          snd keys.(!s1) @@ Some nval; 
+        done;
+        while !s2 < rstop && fst keys.(!s2) = k do
+          snd keys.(!s2) @@ Some nval;
+          s2 := !s2 + 1
+        done;
+      end
+      else begin
+        while !s1 < rstop && fst keys.(!s1) < k do s1 := !s1 + 1 done;
+        s2 := !s1;
+        while !s2 < rstop && fst keys.(!s2) = k do
+          snd keys.(!s2) (Some nval);
+          s2 := !s2 + 1
+        done;
+      end;
+      (* let split = binary_search keys k rstart rstop in
+      let s1 = ref split and s2 = ref split in
+      while !s1 > rstart && fst keys.(!s1 - 1) = k do
+        s1 := !s1 - 1;
+        snd keys.(!s1) @@ Some nval; 
+      done;
+      while !s2 < rstop && fst keys.(!s2) = k do
+        snd keys.(!s2) @@ Some nval;
+        s2 := !s2 + 1
+      done; *)
+      let _ = Domainslib.Task.async pool 
+        (fun () -> par_search_aux op_threshold height_threshold ~pool (Sequential.left node) ~keys ~range:(rstart, !s1)) in
+      let _ = Domainslib.Task.async pool
+        (fun () -> par_search_aux op_threshold height_threshold ~pool (Sequential.right node) ~keys ~range:(!s2, rstop)) in ()
+      (* Domainslib.Task.await pool l; Domainslib.Task.await pool r *)
+
+  let par_search ?search_threshold ?tree_threshold ~pool (t: 'a t) keys =
+    let search_threshold = match search_threshold with Some t -> t | None -> !avltree_search_sequential_threshold in
+    let tree_threshold = match tree_threshold with Some t -> t | None -> !avltree_search_height_threshold in
+    Sort.sort pool ~compare:(fun (k, _) (k', _) -> V.compare k k') keys;
+    par_search_aux search_threshold tree_threshold ~pool (Sequential.root_node t) ~keys ~range:(0, Array.length keys)
+
+  (* let rec par_search_aux op_threshold height_threshold ~pool (t: 'a t) ~keys ~range:(rstart, rstop) =
     let n = rstop - rstart in
     if n <= 0 then ()
     else if n <= op_threshold || Sequential.height (Sequential.root_node t) <= height_threshold then
-      Domainslib.Task.parallel_for pool ~start:rstart ~finish:(rstop - 1) ~body:(fun i ->
+      for i = rstart to rstop - 1 do let (k,kont) = keys.(i) in kont @@ Sequential.search k t done
+      (* Domainslib.Task.parallel_for pool ~start:rstart ~finish:(rstop - 1) ~body:(fun i ->
         let (k,kont) = keys.(i) in
-        kont @@ Sequential.search k t)
+        kont @@ Sequential.search k t) *)
     else
       let (ln, mn, rn) = Sequential.expose @@ Sequential.root_node t in
       let lt = {Sequential.root = ln} and rt = {Sequential.root = rn} in
@@ -322,61 +409,16 @@ module Make (V: Map.OrderedType) = struct
       let _ = Domainslib.Task.async pool 
         (fun () -> par_search_aux op_threshold height_threshold ~pool lt ~keys ~range:(rstart, !mid1)) in
       let _ = Domainslib.Task.async pool
-        (fun () -> par_search_aux op_threshold height_threshold ~pool rt ~keys ~range:(!mid2, rstop)) in ()
+        (fun () -> par_search_aux op_threshold height_threshold ~pool rt ~keys ~range:(!mid2, rstop)) in () *)
 
-  (* Section searches depending on node *)
-  (* let rec par_search_aux search_threshold tree_threshold pool t ~keys ~range:(rstart, rstop) =
-    let h = Sequential.height @@ Sequential.root_node t in
-    let n = rstop - rstart in
-    if n <= 0 then ()
-    else if n < search_threshold || h < tree_threshold then
-      for i = rstart to rstop - 1 do
-        let (k, kont) = keys.(i) in kont @@ Sequential.search k t
-      done
-    else 
-      match Sequential.root_node t with
-      | Sequential.Leaf -> for i = rstart to rstop - 1 do
-          let (_, kont) = keys.(i) in kont None  (* No need to search here, empty tree *)
-        done
-      | Node rn ->
-        try begin
-          let (idx, (k, _)) = binary_search keys rn.key rstart rstop in
-          let i = ref idx in
-          let ck = ref k in
-          if k == Sequential.key @@ Sequential.root_node t then 
-            while !ck == k && !i < rstop do
-              let (k, kont) = keys.(!i) in kont @@ Sequential.search k t;
-              i := !i + 1; ck := k
-            done;
-          let _ = Domainslib.Task.async pool 
-            (fun () -> par_search_aux
-              search_threshold tree_threshold pool
-              {root = Sequential.right @@ Sequential.root_node t} ~keys ~range:(!i, rstop)) in
-          let _ = Domainslib.Task.async pool 
-            (fun () -> par_search_aux
-              search_threshold tree_threshold pool
-              {root = Sequential.left @@ Sequential.root_node t} ~keys ~range:(rstart, !i)) in ()
-        end with _ -> for i = rstart to rstop - 1 do
-          let (_, kont) = keys.(i) in kont None
-        done *)
-    (* else if n > threshold then
-      let num_par = n / threshold + if n mod threshold > 0 then 1 else 0 in
-      Domainslib.Task.parallel_for pool ~start:0 ~finish:(num_par - 1) ~body:(fun i ->
-        par_search_aux threshold pool t ~keys ~range:(rstart + i * threshold, min rstop @@ rstart + (i + 1) * threshold)
-      );
-    else
-      for i = rstart to rstop - 1 do
-        let (k, kont) = keys.(i) in kont @@ Sequential.search k t
-      done *)
-  
-  (* Split the tree
-  let rec par_search_aux threshold pool t ~keys ~range:(rstart, rstop) =
+  (* Split the tree *)
+  (* let rec par_search_aux threshold th ~pool t ~keys ~range:(rstart, rstop) =
     let n = rstop - rstart in
     if n <= 0 then ()
     else if n > threshold then
       let num_par = n / threshold + if n mod threshold > 0 then 1 else 0 in
       Domainslib.Task.parallel_for pool ~start:0 ~finish:(num_par - 1) ~body:(fun i ->
-        par_search_aux threshold pool t ~keys ~range:(rstart + i * threshold, min rstop @@ rstart + (i + 1) * threshold)
+        par_search_aux threshold th ~pool t ~keys ~range:(rstart + i * threshold, min rstop @@ rstart + (i + 1) * threshold)
       );
     else
       for i = rstart to rstop - 1 do
@@ -397,11 +439,11 @@ module Make (V: Map.OrderedType) = struct
         let (k, kont) = keys.(i) in kont @@ Sequential.search k t
       done *)
 
-  let par_search ?search_threshold ?tree_threshold ~pool (t: 'a t) keys =
+  (* let par_search ?search_threshold ?tree_threshold ~pool (t: 'a t) keys =
     let search_threshold = match search_threshold with Some t -> t | None -> !avltree_search_sequential_threshold in
     let tree_threshold = match tree_threshold with Some t -> t | None -> !avltree_search_height_threshold in
     Sort.sort pool ~compare:(fun (k, _) (k', _) -> V.compare k k') keys;
-    par_search_aux search_threshold tree_threshold ~pool t ~keys ~range:(0, Array.length keys)
+    par_search_aux search_threshold tree_threshold ~pool t ~keys ~range:(0, Array.length keys) *)
 
   (* Linear traversal of inserts *)
   (* let rec par_insert_aux op_threshold height_threshold ~pool (t: 'a t) ~inserts ~range:(rstart, rstop) =

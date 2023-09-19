@@ -1,7 +1,8 @@
 [@@@warning "-32-26"]
-let rbtree_insert_sequential_threshold = ref 100
-let rbtree_search_sequential_threshold = ref 1
-let rbtree_search_height_threshold = ref 1
+let rbtree_insert_sequential_threshold = ref 64
+let rbtree_insert_height_threshold = ref 3
+let rbtree_search_sequential_threshold = ref 20
+let rbtree_search_height_threshold = ref 2
 
 module Make (V: Map.OrderedType) = struct
 
@@ -34,6 +35,11 @@ module Make (V: Map.OrderedType) = struct
       match n with
       | Leaf -> failwith "Key function: n is a leaf"
       | Node n' -> n'.key
+
+    let tval n =
+      match n with
+      | Leaf -> failwith "Value function: n is a leaf"
+      | Node n' -> n'.tval
 
     let left n =
       match n with
@@ -150,6 +156,8 @@ module Make (V: Map.OrderedType) = struct
       flatten_aux t.root
 
     let new_tree () = {root = Leaf}
+
+    let new_tree_with_node n = {root = n}
 
     let new_node k v = Node {
       key = k;
@@ -269,15 +277,15 @@ module Make (V: Map.OrderedType) = struct
         | Leaf -> (n.colour <- Black; n.bheight <- 2; n.parent <- Leaf; t.root <- new_node)
         | Node _ -> (n.colour <- Red; insert_aux new_node t.root t)
 
-    let rec get_black_height_aux acc n =
+    (* let rec get_black_height_aux acc n =
       match n with
       | Leaf -> acc + 1
       | Node n' -> get_black_height_aux (acc + if n'.colour = Black then 1 else 0) n'.left
 
-    let get_black_height n = get_black_height_aux 0 n
+    let get_black_height n = get_black_height_aux 0 n *)
 
     let get_rank n = 
-      let bh = get_black_height n in
+      let bh = bheight n in
       if get_node_colour n = Black then 2 * (bh - 1) else 2 * bh - 1
 
     let rec join_right tl n tr =
@@ -396,18 +404,33 @@ module Make (V: Map.OrderedType) = struct
 
   let rec binary_search arr target left right =
     if left > right then
-      match arr.(left) with
-      | (key, _) when key >= target -> (left, arr.(left))
-      | _ -> raise Not_found (* No element greater than or equal to the target *)
+      match fst arr.(left) with
+      | key when key >= target -> left
+      | _ -> 0 (* No element greater than or equal to the target *)
     else
       let mid = (left + right) / 2 in
-      match arr.(mid) with
-      | (key, value) when key = target -> (mid, (key, value)) (* Found the target element *)
-      | (key, _) when key < target -> binary_search arr target (mid + 1) right
+      match fst arr.(mid) with
+      | key when key = target -> mid (* Found the target element *)
+      | key when key < target -> binary_search arr target (mid + 1) right
       | _ -> binary_search arr target left (mid - 1)
 
+  let binary_search arr target left right =
+    let left = ref left and right = ref right in
+    let mid = ref @@ (!left + !right) / 2 in
+    let found = ref false in
+    while !left <= !right && not !found do
+      mid := (!left + !right) / 2;
+      let ck = fst arr.(!mid) in
+      if ck = target then found := true
+      else if ck < target then left := !mid + 1
+      else right := !mid - 1
+    done;
+    if !found then !mid
+    else if fst arr.(!left) >= target then !left
+    else 0
+
   (* Section searches depending on node *)
-  let rec par_search_aux search_threshold tree_threshold pool t ~keys ~range:(rstart, rstop) =
+  (* let rec par_search_aux search_threshold tree_threshold pool t ~keys ~range:(rstart, rstop) =
     let h = Sequential.bheight @@ Sequential.root_node t in
     let n = rstop - rstart in
     if n <= 0 then ()
@@ -422,7 +445,7 @@ module Make (V: Map.OrderedType) = struct
         done
       | Node rn ->
         try begin
-          let (idx, (k, _)) = binary_search keys rn.key rstart rstop in
+          let idx = binary_search keys rn.key rstart rstop in
           let i = ref idx in
           let ck = ref k in
           if k == Sequential.key @@ Sequential.root_node t then 
@@ -440,13 +463,64 @@ module Make (V: Map.OrderedType) = struct
               {root = Sequential.left @@ Sequential.root_node t} ~keys ~range:(rstart, !i)) in ()
         end with _ -> for i = rstart to rstop - 1 do
           let (_, kont) = keys.(i) in kont None
-        done
+        done *)
+
+  let rec par_search_aux op_threshold height_threshold ~pool node ~keys ~range:(rstart, rstop) =
+    let n = rstop - rstart in
+    if n <= 0 then ()
+    else if node = Sequential.Leaf then
+      for i = rstart to rstop - 1 do let (_,kont) = keys.(i) in kont None done
+    else if n <= op_threshold then
+      for i = rstart to rstop - 1 do let (k,kont) = keys.(i) in kont @@ Sequential.search_aux k node done
+      (* Domainslib.Task.parallel_for pool ~start:rstart ~finish:(rstop - 1) ~body:(fun i ->
+        let (k,kont) = keys.(i) in
+        kont @@ Sequential.search_aux k node) *)
+    else
+      let k = Sequential.key node in
+      let nval = Sequential.tval node in
+      let s1 = ref rstart and s2 = ref rstart in
+      if n > 200 then begin
+        let split = binary_search keys k rstart rstop in
+        s1 := split; s2 := split;
+        while !s1 > rstart && fst keys.(!s1 - 1) = k do
+          s1 := !s1 - 1;
+          snd keys.(!s1) @@ Some nval; 
+        done;
+        while !s2 < rstop && fst keys.(!s2) = k do
+          snd keys.(!s2) @@ Some nval;
+          s2 := !s2 + 1
+        done;
+      end
+      else begin
+        while !s1 < rstop && fst keys.(!s1) < k do s1 := !s1 + 1 done;
+        s2 := !s1;
+        while !s2 < rstop && fst keys.(!s2) = k do
+          snd keys.(!s2) (Some nval);
+          s2 := !s2 + 1
+        done;
+      end;
+      (* let split = binary_search keys k rstart rstop in
+      let s1 = ref split and s2 = ref split in
+      while !s1 > rstart && fst keys.(!s1 - 1) = k do
+        s1 := !s1 - 1;
+        snd keys.(!s1) @@ Some nval;
+      done;
+      while !s2 < rstop && fst keys.(!s2) = k do
+        snd keys.(!s2) @@ Some nval;
+        s2 := !s2 + 1
+      done; *)
+      (* let lt = Sequential.new_tree_with_node @@ Sequential.left n in
+      let rt = Sequential.new_tree_with_node @@ Sequential.right n in *)
+      let _ = Domainslib.Task.async pool 
+        (fun () -> par_search_aux op_threshold height_threshold ~pool (Sequential.left node) ~keys ~range:(rstart, !s1)) in
+      let _ = Domainslib.Task.async pool
+        (fun () -> par_search_aux op_threshold height_threshold ~pool (Sequential.right node) ~keys ~range:(!s2, rstop)) in ()
 
   let par_search ?search_threshold ?tree_threshold ~pool (t: 'a t) keys =
     let search_threshold = match search_threshold with Some t -> t | None -> !rbtree_search_sequential_threshold in
     let tree_threshold = match tree_threshold with Some t -> t | None -> !rbtree_search_height_threshold in
     Sort.sort pool ~compare:(fun (k, _) (k', _) -> V.compare k k') keys;
-    par_search_aux search_threshold tree_threshold pool t ~keys ~range:(0, Array.length keys)
+    par_search_aux search_threshold tree_threshold ~pool (Sequential.root_node t) ~keys ~range:(0, Array.length keys)
 
   (* let rec par_search_aux threshold pool t ~keys ~range:(rstart, rstop) =
     let n = rstop - rstart in
@@ -466,7 +540,7 @@ module Make (V: Map.OrderedType) = struct
     Sort.sort pool ~compare:(fun (k, _) (k', _) -> V.compare k k') keys;
     par_search_aux threshold pool t ~keys ~range:(0, Array.length keys) *)
 
-  let rec par_insert_aux threshold ~pool (t: 'a t) ~inserts ~range:(rstart, rstop) =
+  (* let rec par_insert_aux threshold ~pool (t: 'a t) ~inserts ~range:(rstart, rstop) =
     let n = rstop - rstart in
     if n <= 0 then ()
     else if n <= threshold then
@@ -495,7 +569,40 @@ module Make (V: Map.OrderedType) = struct
   let par_insert ?threshold ~pool (t: 'a t) inserts =
     let threshold = match threshold with Some t -> t | None -> !rbtree_insert_sequential_threshold in
     Sort.sort pool ~compare:(fun (k, _) (k', _) -> V.compare k k') inserts;
-    par_insert_aux threshold ~pool t ~inserts ~range:(0, Array.length inserts)
+    par_insert_aux threshold ~pool t ~inserts ~range:(0, Array.length inserts) *)
+  
+let rec par_insert_aux op_threshold height_threshold ~pool (t: 'a t) ~inserts ~range:(rstart, rstop) =
+  let n = rstop - rstart in
+  if n <= 0 then ()
+  else if n <= op_threshold || Sequential.bheight (Sequential.root_node t) <= height_threshold then
+    for i = rstart to rstop - 1 do
+      let (k, v) = inserts.(i) in
+      Sequential.insert (Sequential.new_node k v) t
+    done
+  else
+    let (ln, mn, rn) = Sequential.expose @@ Sequential.root_node t in
+    let lt = Sequential.new_tree_with_node ln and rt = Sequential.new_tree_with_node rn in
+    let k = Sequential.key mn in
+    let split = binary_search inserts k rstart rstop in
+    (* let s1 = ref split and s2 = ref split in
+    while !s1 > rstart && fst inserts.(!s1 - 1) = k do s1 := !s1 - 1 done;
+    while fst inserts.(!s2) = k && !s2 >= rstop do s2 := !s2 + 1 done; *)
+    let l = Domainslib.Task.async pool 
+      (fun () -> par_insert_aux op_threshold height_threshold ~pool lt ~inserts ~range:(rstart, split)) in
+    let r = Domainslib.Task.async pool
+      (fun () -> par_insert_aux op_threshold height_threshold ~pool rt ~inserts ~range:(split, rstop)) in
+    Domainslib.Task.await pool l; Domainslib.Task.await pool r;
+    let (nlt, _, _) = Sequential.split lt (Sequential.key mn) in (* Make sure there's no duplicate *)
+    let (_, _, nrt) = Sequential.split rt (Sequential.key mn) in
+    let nt = Sequential.join nlt mn nrt in
+    (* let nt = Sequential.merge_three_nodes lt.root mn rt.root in *)
+    t.root <- nt.root
+  
+  let par_insert ?op_threshold ?height_threshold ~pool (t: 'a t) inserts =
+    let op_threshold = match op_threshold with Some t -> t | None -> !rbtree_insert_sequential_threshold in
+    let height_threshold = match height_threshold with Some t -> t | None -> !rbtree_insert_height_threshold in
+    Sort.sort pool ~compare:(fun (k, _) (k', _) -> V.compare k k') inserts;
+    par_insert_aux op_threshold height_threshold ~pool t ~inserts ~range:(0, Array.length inserts)
 
   let run (type a) (t: a t) (pool: Domainslib.Task.pool) (ops: a wrapped_op array) =
     let searches: (V.t * (a option -> unit)) list ref = ref [] in
