@@ -208,3 +208,70 @@ module Batched = struct
     end
 
 end
+
+
+module ExplicitlyBatched = struct
+
+  type t = unit IntAvltree.t
+
+  (* type test_spec = generic_test_spec *)
+  type test_spec = {
+    spec: generic_test_spec;
+    mutable insert_elements: (int * unit) array;
+    mutable search_elements: (int * (unit option -> unit)) array;
+  }
+
+  type spec_args = generic_spec_args
+
+  let spec_args: spec_args Cmdliner.Term.t = generic_spec_args
+
+  let test_spec ~count spec_args =
+    let spec = generic_test_spec ~count spec_args in
+    {spec; insert_elements=[||]; search_elements=[||]}
+
+  let init _pool (test_spec: test_spec) =
+    generic_init test_spec.spec (fun initial_elements ->
+      test_spec.insert_elements <- Array.map (fun i -> (i, ())) test_spec.spec.insert_elements;
+      test_spec.search_elements <- Array.map (fun i -> (i, (fun _ -> ()))) test_spec.spec.search_elements;
+      let tree = IntAvltree.Sequential.new_tree () in
+      Array.iter (fun i -> IntAvltree.Sequential.insert i () tree)
+        initial_elements;
+      tree)
+
+  let run pool (tree: t) test_spec =
+    generic_run test_spec.spec @@ fun () -> 
+    if Array.length test_spec.insert_elements > 0 then
+      IntAvltree.par_insert ~pool tree test_spec.insert_elements;
+    if Array.length test_spec.spec.search_elements > 0 then
+      ignore @@ IntAvltree.par_search ~pool tree test_spec.search_elements
+
+
+  let cleanup (t: t) (test_spec: test_spec) =
+    if test_spec.spec.args.should_validate then begin
+      let num_nodes = IntAvltree.Sequential.num_nodes t in
+      if num_nodes <> Array.length test_spec.insert_elements + Array.length test_spec.spec.initial_elements
+        then Format.ksprintf failwith "Inserted %d elements, but found only %d in the tree"
+      (Array.length test_spec.insert_elements + Array.length test_spec.spec.initial_elements)
+      num_nodes;
+      let btree_flattened = IntAvltree.Sequential.flatten t |> Array.of_list in
+      let all_elements = Array.concat [test_spec.spec.insert_elements; test_spec.spec.initial_elements] in
+      Array.sort Int.compare all_elements;
+      if Array.length btree_flattened <> Array.length all_elements then
+      Format.ksprintf failwith "length of flattened btree (%d) did not match inserts (%d) (no_elements=%d)"
+        (Array.length btree_flattened) (Array.length all_elements) (num_nodes);
+
+      for i = 0 to Array.length btree_flattened - 1 do
+        if fst btree_flattened.(i) <> all_elements.(i) then
+          Format.ksprintf failwith "element %d of the btree was expected to be %d, but got %d" i
+            all_elements.(i) (fst btree_flattened.(i));
+      done;
+
+      Array.iter (fun elt ->
+        match IntAvltree.Sequential.search elt t with
+        | Some _ -> ()
+        | None -> Format.ksprintf failwith "Could not find inserted element %d in tree" elt
+      ) test_spec.spec.insert_elements;
+    end
+
+end
+

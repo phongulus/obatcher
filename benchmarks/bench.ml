@@ -41,6 +41,7 @@ let () =
 
   Hashtbl.add benchmarks "avltree-sequential" (module Avltree.Sequential);
   Hashtbl.add benchmarks "avltree-batched" (module Avltree.Batched);
+  Hashtbl.add benchmarks "avltree-explicitly-batched" (module Avltree.ExplicitlyBatched); 
 
   Hashtbl.add benchmarks "btree-sequential" (module Btree.Sequential);
   Hashtbl.add benchmarks "btree-coarse-grained" (module Btree.CoarseGrained);
