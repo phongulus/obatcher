@@ -97,6 +97,32 @@ def build_results(data_structures, args, param='domains', values=None):
         results.append(result)
     return results
 
+def build_results_seq_opt(data_structures, args, sequential=None, param='domains', values=None):
+    results = []
+    if not values:
+        values = range(1, 9)
+    no_searches = args.get('no_searches', 0)
+    count = args.get('count', 0)
+    workload_size = float(no_searches + count)
+    if sequential:
+        seq_time, _ = run_test(sequential, {param:1, **args})
+        seq_throughput = workload_size / float(seq_time)
+        seq_name = test_label(sequential)
+    for i in tqdm(values):
+        result = {param: i}
+        if sequential:
+            result[seq_name] = seq_time
+            result[seq_name + "-throughput"] = seq_throughput
+            result[seq_name + "-sd"] = 0
+        for data_structure in data_structures:
+            time, sd = run_test(data_structure, {param:i, **args})
+            name = test_label(data_structure)
+            result[name] = time
+            result[name + "-throughput"] = workload_size / float(time)
+            result[name + "-sd"] = sd
+        results.append(result)
+    return results
+
 def plot_results(param, data_structures, results, title=None, xlabel=None):
     if not title:
         title = f"Comparison of {param} values on data structure"
@@ -130,7 +156,7 @@ def plot_throughput_results(param, data_structures, results, title=None, xlabel=
         plt.errorbar(param_values, values, label=name)
     plt.title(title)
     plt.xlabel(xlabel)
-    plt.ylabel('Time (s)')
+    plt.ylabel('Throughput (ops/sec)')
     plt.legend()
     plt.show() 
 
