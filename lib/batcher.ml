@@ -87,6 +87,7 @@ module Make1 (S : S1) = struct
     pool : Task.pool;
     mutable ds : 'a S.t;
     running : bool Atomic.t;
+    current_launch_id : int Atomic.t;
     container : 'a S.wrapped_op Ts_container.t
   }
 
@@ -94,6 +95,7 @@ module Make1 (S : S1) = struct
     { pool;
       ds = S.init ();
       running = Atomic.make false;
+      current_launch_id = Atomic.make (-1);
       container = Ts_container.create () }
 
   let rec try_launch t =
@@ -101,8 +103,15 @@ module Make1 (S : S1) = struct
     && Atomic.compare_and_set t.running false true 
     then
       begin
+        let launch_id = Random.int 1000 in
+        Atomic.set t.current_launch_id launch_id;
+        (* Printf.printf "Launching! Id: %d\n" launch_id; *)
         let batch = Ts_container.get t.container in
         S.run t.ds t.pool batch;
+        if Atomic.get t.current_launch_id <> launch_id then
+          failwith "Launch id changed";
+        Atomic.set t.current_launch_id (-1);
+        (* Printf.printf "Done! Id: %d\n" launch_id; *)
         Atomic.set t.running false;
         try_launch t
       end
@@ -112,8 +121,15 @@ module Make1 (S : S1) = struct
     && Atomic.compare_and_set t.running false true 
     then
       begin
+        let launch_id = Random.int 1000 in
+        Atomic.set t.current_launch_id launch_id;
+        (* Printf.printf "Launching! Id: %d\n" launch_id; *)
         let batch = Ts_container.get t.container in
         S.run t.ds t.pool batch;
+        if Atomic.get t.current_launch_id <> launch_id then
+          failwith "Launch id changed";
+        Atomic.set t.current_launch_id (-1);
+        (* Printf.printf "Done! Id: %d\n" launch_id; *)
         Atomic.set t.running false;
         ignore @@ Task.async t.pool (fun () -> try_launch t)
       end
@@ -124,6 +140,10 @@ module Make1 (S : S1) = struct
     Ts_container.add t.container op_set;
     try_launch t;
     Task.await t.pool pr
+
+  let get_total_operations t = Ts_container.total_added t.container
+
+  let is_batch_running t = Ts_container.size t.container > 0 || Atomic.get t.running
 
   let unsafe_get_internal_data t = t.ds
   [@@@alert unsafe "For developer use"]

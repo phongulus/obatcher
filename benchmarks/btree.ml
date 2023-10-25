@@ -229,7 +229,20 @@ module Batched = struct
         then BatchedIntBtree.apply tree (Insert (test_spec.insert_elements.(i), ()))
         else 
           ignore (BatchedIntBtree.apply tree (Search test_spec.search_elements.(i - Array.length test_spec.insert_elements)))
-      )
+      );
+    (* Wait until the batch finishes processing *)
+    (* while BatchedIntBtree.is_batch_running tree do
+      Thread.yield ()
+    done *)
+    if BatchedIntBtree.is_batch_running tree then begin
+      let pr, set = Domainslib.Task.promise () in
+      let rec wait_for_batch f =
+        if BatchedIntBtree.is_batch_running tree then
+          ignore @@ Domainslib.Task.async pool (fun () -> wait_for_batch f)
+        else f () in
+      wait_for_batch set;
+      Domainslib.Task.await pool pr
+    end
 
     
   let cleanup (t: t) (test_spec: test_spec) =

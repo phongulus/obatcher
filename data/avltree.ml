@@ -331,6 +331,7 @@ module Make (V: Map.OrderedType) = struct
       | key when key < target -> binary_search arr target (mid + 1) right
       | _ -> binary_search arr target left (mid - 1) *)
 
+  (** Use both binary search and linear search to traverse operations array *)
   let rec par_search_aux op_threshold height_threshold ~pool node ~keys ~range:(rstart, rstop) =
     let n = rstop - rstart in
     if n <= 0 then ()

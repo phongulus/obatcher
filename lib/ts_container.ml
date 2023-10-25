@@ -2,6 +2,7 @@ module ChanBased = struct
   type 'a t = {
     chan : 'a Chan.t;
     size : int Atomic.t;
+    total_added : int Atomic.t;
     batch_limit : int
   }
 
@@ -10,18 +11,27 @@ module ChanBased = struct
     {
       chan = Chan.make_unbounded ();
       size = Atomic.make 0;
+      total_added = Atomic.make 0;
       batch_limit;
     }
   let add t elt =
     ignore @@ Atomic.fetch_and_add t.size 1;
     Chan.send t.chan elt
   let get t = 
-    let batch_size = Atomic.exchange t.size 0 in
+    (* let batch_size = Atomic.exchange t.size 0 in *)
+    let batch_size = Atomic.get t.size in
+    (* Printf.printf "batch_size = %d\n" batch_size; *)
     let limit = min batch_size t.batch_limit in
-    let topup = batch_size - limit in
-    let _ = Atomic.fetch_and_add t.size topup in
+    let _ = Atomic.fetch_and_add t.total_added limit in
+    (* let topup = batch_size - limit in *)
+    (* let _ = Atomic.fetch_and_sub t.size topup in *)
+    let batch_size_2 = Atomic.get t.size in
+    if batch_size_2 < batch_size then Printf.printf "batch_size_2 < batch_size\n%!";
+    let _ = Atomic.fetch_and_add t.size (-limit) in
     Array.init limit (fun _ -> Chan.recv t.chan)
   let size t = Atomic.get t.size 
+
+  let total_added t = Atomic.get t.total_added
 end
 
 include ChanBased

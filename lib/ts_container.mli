@@ -11,3 +11,5 @@ val get : 'a t -> 'a array
 (** [get t] returns an array of batched operations *)
 
 val size : 'a t -> int
+
+val total_added : 'a t -> int
