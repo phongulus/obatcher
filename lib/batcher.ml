@@ -72,6 +72,20 @@ module Make (S : S) = struct
     try_launch t;
     Task.await t.pool pr
 
+  let is_batch_running t = Ts_container.size t.container > 0 || Atomic.get t.running
+
+  let rec wait_for_batch t f =
+    if is_batch_running t then
+      ignore @@ Task.async t.pool (fun () -> wait_for_batch t f)
+    else f ()
+
+  let wait_for_batch t =
+    if is_batch_running t then begin
+      let pr, set = Task.promise () in
+      wait_for_batch t set;
+      Task.await t.pool pr
+    end
+
   let unsafe_get_internal_data t = t.ds
   [@@@alert unsafe "For developer use"]
 
@@ -124,6 +138,20 @@ module Make1 (S : S1) = struct
     Ts_container.add t.container op_set;
     try_launch t;
     Task.await t.pool pr
+
+  let is_batch_running t = Ts_container.size t.container > 0 || Atomic.get t.running
+
+  let rec wait_for_batch t f =
+    if is_batch_running t then
+      ignore @@ Task.async t.pool (fun () -> wait_for_batch t f)
+    else f ()
+
+  let wait_for_batch t =
+    if is_batch_running t then begin
+      let pr, set = Task.promise () in
+      wait_for_batch t set;
+      Task.await t.pool pr
+    end
 
   let unsafe_get_internal_data t = t.ds
   [@@@alert unsafe "For developer use"]
