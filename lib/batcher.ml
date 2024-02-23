@@ -33,33 +33,39 @@ module Make (S : S) = struct
     pool : Task.pool;
     mutable ds : S.t;
     running : bool Atomic.t;
-    container : S.wrapped_op Ts_container.t
+    container : S.wrapped_op Ts_container.t;
+    mutable last_run : float
   }
 
   let init pool = 
     { pool;
       ds = S.init ();
       running = Atomic.make false;
-      container = Ts_container.create () }
+      container = Ts_container.create ();
+      last_run = Sys.time () }
 
 
   let rec try_launch t =
-    if Ts_container.size t.container > 0 
+    let current_time = Sys.time () in
+    if (Ts_container.size t.container > 100 && current_time -. t.last_run > 0.001) 
     && Atomic.compare_and_set t.running false true 
     then
       begin
         let batch = Ts_container.get t.container in
+        t.last_run <- current_time;
         S.run t.ds t.pool batch;
         Atomic.set t.running false;
         try_launch t
       end
 
   let try_launch t =
-    if Ts_container.size t.container > 0 
+    let current_time = Sys.time () in
+    if (Ts_container.size t.container > 100 && current_time -. t.last_run > 0.001) 
     && Atomic.compare_and_set t.running false true 
     then
       begin
         let batch = Ts_container.get t.container in
+        t.last_run <- current_time;
         S.run t.ds t.pool batch;
         Atomic.set t.running false;
         ignore @@ Task.async t.pool (fun () -> try_launch t)
@@ -101,32 +107,38 @@ module Make1 (S : S1) = struct
     pool : Task.pool;
     mutable ds : 'a S.t;
     running : bool Atomic.t;
-    container : 'a S.wrapped_op Ts_container.t
+    container : 'a S.wrapped_op Ts_container.t;
+    mutable last_run : float
   }
 
   let init pool = 
     { pool;
       ds = S.init ();
       running = Atomic.make false;
-      container = Ts_container.create () }
+      container = Ts_container.create ();
+      last_run = Sys.time () }
 
   let rec try_launch t =
-    if Ts_container.size t.container > 0 
+    let current_time = Sys.time () in
+    if (Ts_container.size t.container > 100 && current_time -. t.last_run > 0.001)
     && Atomic.compare_and_set t.running false true 
     then
       begin
         let batch = Ts_container.get t.container in
+        t.last_run <- current_time;
         S.run t.ds t.pool batch;
         Atomic.set t.running false;
         try_launch t
       end
 
   let try_launch t =
-    if Ts_container.size t.container > 0 
+    let current_time = Sys.time () in
+    if (Ts_container.size t.container > 100 && current_time -. t.last_run > 0.001)
     && Atomic.compare_and_set t.running false true 
     then
       begin
         let batch = Ts_container.get t.container in
+        t.last_run <- current_time;
         S.run t.ds t.pool batch;
         Atomic.set t.running false;
         ignore @@ Task.async t.pool (fun () -> try_launch t)
@@ -152,6 +164,11 @@ module Make1 (S : S1) = struct
       wait_for_batch t set;
       Task.await t.pool pr
     end
+
+  (* let rec wait_for_batch t =
+    if is_batch_running t
+    then (Task.yield t.pool; wait_for_batch t)
+    else () *)
 
   let unsafe_get_internal_data t = t.ds
   [@@@alert unsafe "For developer use"]
