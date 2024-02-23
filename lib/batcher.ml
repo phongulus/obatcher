@@ -52,7 +52,7 @@ module Make (S : S) = struct
   let rec try_launch t =
     (* let current_time_ref = ref None in
     if (Ts_container.size t.container > 100 || check_and_update_last_time t current_time_ref) *)
-    if Ts_container.size t.container > 100
+    if Ts_container.size t.container > 0
     && Atomic.compare_and_set t.running false true 
     then
       begin
@@ -66,7 +66,7 @@ module Make (S : S) = struct
   let try_launch t =
     (* let current_time_ref = ref None in
     if (Ts_container.size t.container > 100 || check_and_update_last_time t current_time_ref)  *)
-    if Ts_container.size t.container > 100
+    if Ts_container.size t.container > 0
     && Atomic.compare_and_set t.running false true 
     then
       begin
@@ -132,7 +132,7 @@ module Make1 (S : S1) = struct
   let rec try_launch t =
     (* let current_time_ref = ref None in
     if (Ts_container.size t.container > 100 || check_and_update_last_time t current_time_ref) *)
-    if Ts_container.size t.container > 100
+    if Ts_container.size t.container > 0
     && Atomic.compare_and_set t.running false true 
     then
       begin
@@ -146,7 +146,7 @@ module Make1 (S : S1) = struct
   let try_launch t =
     (* let current_time_ref = ref None in
     if (Ts_container.size t.container > 100 || check_and_update_last_time t current_time_ref) *)
-    if Ts_container.size t.container > 100
+    if Ts_container.size t.container > 0
     && Atomic.compare_and_set t.running false true 
     then
       begin
