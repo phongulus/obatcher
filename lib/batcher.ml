@@ -44,28 +44,34 @@ module Make (S : S) = struct
       container = Ts_container.create ();
       last_run = Sys.time () }
 
+  (* let check_and_update_last_time t current_time_ref =
+    let current_time = Sys.time () in
+    current_time_ref := Some current_time;
+    current_time -. t.last_run > 0.001 *)
 
   let rec try_launch t =
-    let current_time = Sys.time () in
-    if (Ts_container.size t.container > 100 || current_time -. t.last_run > 0.001) 
+    (* let current_time_ref = ref None in
+    if (Ts_container.size t.container > 100 || check_and_update_last_time t current_time_ref) *)
+    if Ts_container.size t.container > 100
     && Atomic.compare_and_set t.running false true 
     then
       begin
         let batch = Ts_container.get t.container in
-        t.last_run <- current_time;
+        (* if !current_time_ref != None then t.last_run <- Option.get !current_time_ref; *)
         S.run t.ds t.pool batch;
         Atomic.set t.running false;
         try_launch t
       end
 
   let try_launch t =
-    let current_time = Sys.time () in
-    if (Ts_container.size t.container > 100 || current_time -. t.last_run > 0.001) 
+    (* let current_time_ref = ref None in
+    if (Ts_container.size t.container > 100 || check_and_update_last_time t current_time_ref)  *)
+    if Ts_container.size t.container > 100
     && Atomic.compare_and_set t.running false true 
     then
       begin
         let batch = Ts_container.get t.container in
-        t.last_run <- current_time;
+        (* if !current_time_ref != None then t.last_run <- Option.get !current_time_ref; *)
         S.run t.ds t.pool batch;
         Atomic.set t.running false;
         ignore @@ Task.async t.pool (fun () -> try_launch t)
@@ -118,27 +124,34 @@ module Make1 (S : S1) = struct
       container = Ts_container.create ();
       last_run = Sys.time () }
 
-  let rec try_launch t =
+  (* let check_and_update_last_time t current_time_ref =
     let current_time = Sys.time () in
-    if (Ts_container.size t.container > 100 || current_time -. t.last_run > 0.001)
+    current_time_ref := Some current_time;
+    current_time -. t.last_run > 0.001 *)
+
+  let rec try_launch t =
+    (* let current_time_ref = ref None in
+    if (Ts_container.size t.container > 100 || check_and_update_last_time t current_time_ref) *)
+    if Ts_container.size t.container > 100
     && Atomic.compare_and_set t.running false true 
     then
       begin
         let batch = Ts_container.get t.container in
-        t.last_run <- current_time;
+        (* if !current_time_ref != None then t.last_run <- Option.get !current_time_ref; *)
         S.run t.ds t.pool batch;
         Atomic.set t.running false;
         try_launch t
       end
 
   let try_launch t =
-    let current_time = Sys.time () in
-    if (Ts_container.size t.container > 100 || current_time -. t.last_run > 0.001)
+    (* let current_time_ref = ref None in
+    if (Ts_container.size t.container > 100 || check_and_update_last_time t current_time_ref) *)
+    if Ts_container.size t.container > 100
     && Atomic.compare_and_set t.running false true 
     then
       begin
         let batch = Ts_container.get t.container in
-        t.last_run <- current_time;
+        (* if !current_time_ref != None then t.last_run <- Option.get !current_time_ref; *)
         S.run t.ds t.pool batch;
         Atomic.set t.running false;
         ignore @@ Task.async t.pool (fun () -> try_launch t)
