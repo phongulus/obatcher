@@ -42,36 +42,36 @@ module Make (S : S) = struct
       ds = S.init ();
       running = Atomic.make false;
       container = Ts_container.create ();
-      last_run = Sys.time () }
-
-  (* let check_and_update_last_time t current_time_ref =
-    let current_time = Sys.time () in
-    current_time_ref := Some current_time;
-    current_time -. t.last_run > 0.001 *)
+      last_run = 0.
+    }
 
   let rec try_launch t =
-    (* let current_time_ref = ref None in
-    if (Ts_container.size t.container > 100 || check_and_update_last_time t current_time_ref) *)
-    if Ts_container.size t.container > 0
-    && Atomic.compare_and_set t.running false true 
+    (* if Ts_container.size t.container > 0
+    && Atomic.compare_and_set t.running false true  *)
+    if Ts_container.size t.container <= 0 then ()
+    else if (Ts_container.size t.container < 1000 && Sys.time () -. t.last_run < 0.001) then
+      ignore @@ Task.async t.pool (fun () -> try_launch t)
+    else if Atomic.compare_and_set t.running false true 
     then
       begin
         let batch = Ts_container.get t.container in
-        (* if !current_time_ref != None then t.last_run <- Option.get !current_time_ref; *)
+        t.last_run <- Sys.time ();
         S.run t.ds t.pool batch;
         Atomic.set t.running false;
         try_launch t
       end
 
   let try_launch t =
-    (* let current_time_ref = ref None in
-    if (Ts_container.size t.container > 100 || check_and_update_last_time t current_time_ref)  *)
-    if Ts_container.size t.container > 0
-    && Atomic.compare_and_set t.running false true 
+    (* if Ts_container.size t.container > 0
+    && Atomic.compare_and_set t.running false true  *)
+    if Ts_container.size t.container <= 0 then ()
+    else if (Ts_container.size t.container < 1000 && Sys.time () -. t.last_run < 0.001) then
+      ignore @@ Task.async t.pool (fun () -> try_launch t)
+    else if Atomic.compare_and_set t.running false true 
     then
       begin
         let batch = Ts_container.get t.container in
-        (* if !current_time_ref != None then t.last_run <- Option.get !current_time_ref; *)
+        t.last_run <- Sys.time ();
         S.run t.ds t.pool batch;
         Atomic.set t.running false;
         ignore @@ Task.async t.pool (fun () -> try_launch t)
@@ -83,6 +83,8 @@ module Make (S : S) = struct
     Ts_container.add t.container op_set;
     try_launch t;
     Task.await t.pool pr
+
+  let restart_batcher_timer t = t.last_run <- Sys.time ()
 
   let is_batch_running t = Ts_container.size t.container > 0 || Atomic.get t.running
 
@@ -97,6 +99,12 @@ module Make (S : S) = struct
       wait_for_batch t set;
       Task.await t.pool pr
     end
+
+  (* let rec wait_for_batch t =
+    if is_batch_running t
+    then (Task.yield t.pool; wait_for_batch t)
+    else () *)
+  
 
   let unsafe_get_internal_data t = t.ds
   [@@@alert unsafe "For developer use"]
@@ -122,36 +130,36 @@ module Make1 (S : S1) = struct
       ds = S.init ();
       running = Atomic.make false;
       container = Ts_container.create ();
-      last_run = Sys.time () }
-
-  (* let check_and_update_last_time t current_time_ref =
-    let current_time = Sys.time () in
-    current_time_ref := Some current_time;
-    current_time -. t.last_run > 0.001 *)
+      last_run = 0.
+    }
 
   let rec try_launch t =
-    (* let current_time_ref = ref None in
-    if (Ts_container.size t.container > 100 || check_and_update_last_time t current_time_ref) *)
-    if Ts_container.size t.container > 0
-    && Atomic.compare_and_set t.running false true 
+    (* if Ts_container.size t.container > 0
+    && Atomic.compare_and_set t.running false true  *)
+    if Ts_container.size t.container <= 0 then ()
+    else if (Ts_container.size t.container < 1000 && Sys.time () -. t.last_run < 0.001) then
+      ignore @@ Task.async t.pool (fun () -> try_launch t)
+    else if Atomic.compare_and_set t.running false true  
     then
       begin
         let batch = Ts_container.get t.container in
-        (* if !current_time_ref != None then t.last_run <- Option.get !current_time_ref; *)
+        t.last_run <- Sys.time ();
         S.run t.ds t.pool batch;
         Atomic.set t.running false;
         try_launch t
       end
 
   let try_launch t =
-    (* let current_time_ref = ref None in
-    if (Ts_container.size t.container > 100 || check_and_update_last_time t current_time_ref) *)
-    if Ts_container.size t.container > 0
-    && Atomic.compare_and_set t.running false true 
+    (* if Ts_container.size t.container > 0
+    && Atomic.compare_and_set t.running false true  *)
+    if Ts_container.size t.container <= 0 then ()
+    else if (Ts_container.size t.container < 1000 && Sys.time () -. t.last_run < 0.001) then
+      ignore @@ Task.async t.pool (fun () -> try_launch t)
+    else if Atomic.compare_and_set t.running false true 
     then
       begin
         let batch = Ts_container.get t.container in
-        (* if !current_time_ref != None then t.last_run <- Option.get !current_time_ref; *)
+        t.last_run <- Sys.time ();
         S.run t.ds t.pool batch;
         Atomic.set t.running false;
         ignore @@ Task.async t.pool (fun () -> try_launch t)
@@ -163,6 +171,8 @@ module Make1 (S : S1) = struct
     Ts_container.add t.container op_set;
     try_launch t;
     Task.await t.pool pr
+
+  let restart_batcher_timer t = t.last_run <- Sys.time ()
 
   let is_batch_running t = Ts_container.size t.container > 0 || Atomic.get t.running
 

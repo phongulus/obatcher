@@ -58,6 +58,8 @@ module Make : functor (S : S) -> sig
   val apply : t -> 'a op -> 'a
   (** [apply t op] applies the operation [op] to [t]. *)
 
+  val restart_batcher_timer : t -> unit
+
   val is_batch_running : t -> bool
   (** [is_batch_running t] returns [true] if there is are active or
       pending operations on the batched data structure. *)
@@ -90,6 +92,8 @@ module Make1 : functor (S : S1) -> sig
 
   val apply : 'a t -> ('a, 'b) op -> 'b
   (** [apply t op] applies the operation [op] to [t]. *)
+
+  val restart_batcher_timer : 'a t -> unit
 
   val is_batch_running : 'a t -> bool
   (** [is_batch_running t] returns [true] if there is are active or
