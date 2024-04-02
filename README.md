@@ -1,6 +1,32 @@
 # Domainslibs Fork - Batching support
 
-Note: For the jupyter notebook, you will need `ipympl` installed.
+This fork introduces support for a technique called "batching" which aims to increase data structure throughput of programs. In programs that run with "batching" support, data structure operations can be processed as a logical "batch" instead of atomic operations which reduces synchronization overhead and opens up more opportunities for optimisation. The goal of this work is to provide the scheduling infrastructure for the community to innovate and build new data structures for OCaml that stand to benefit from batching.
+
+The main contributions of our work include:
+1. A portable Batcher which makes turning explicitly batched data structures to their implicitly batched versions cheap.
+2. A Batcher that allows multiple batched data structures in the same program.
+3. Two functors for turning sequential data structures following either a split-join or expose-repair pattern into implicitly batched ones.
+4. Examples of batched data structures utilising the aforementioned functors, as well as ad-hoc batched data structures. 
+5. Tools for investigating the performance of these batched data structures.
+
+## Build instructions
+
+Install dependencies:
+
+```
+opam switch create 5.1.1
+eval $(opam env)
+opam install dune lockfree qcheck-core qcheck-stm qcheck-multicoretests-util mirage-clock-unix ppx_deriving ppx_deriving_qcheck iter
+opam install batteries progress ptime cmdliner datalog
+```
+
+Build:
+
+```
+dune build
+```
+
+<!-- Note: For the jupyter notebook, you will need `ipympl` installed.
 
 This fork introduces support for a technique called "batching" which aims to increase data structure throughput of programs. In programs that run with "batching" support, data structure operations can be processed as a logical "batch" instead of atomic operations which reduces synchronization overhead and opens up more opportunities for optimisation. The goal of this work is to provide the scheduling infrastructure for the community to innovate and build new data structures for OCaml that stand to benefit from batching.
 
@@ -292,4 +318,4 @@ $ opam switch create 5.0.0+trunk --repo=default,alpha=git+https://github.com/kit
 $ git clone https://github.com/ocaml-multicore/domainslib
 $ cd domainslib
 $ opam pin add domainslib file://`pwd`
-```
+``` -->
