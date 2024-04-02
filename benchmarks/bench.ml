@@ -62,7 +62,34 @@ let () =
   Hashtbl.add benchmarks "datalog-sequential" (module Datalog_bench.Sequential);
   Hashtbl.add benchmarks "datalog-coarse" (module Datalog_bench.CoarseGrained);
   Hashtbl.add benchmarks "datalog-batched" (module Datalog_bench.BatchParallel);
-  Hashtbl.add benchmarks "datalog-non-parallel-batched" (module Datalog_bench.BatchParallelBasic)
+  Hashtbl.add benchmarks "datalog-non-parallel-batched" (module Datalog_bench.BatchParallelBasic);
+
+  Hashtbl.add benchmarks "rbtree-sequential" (module Rbtree.Sequential);
+  Hashtbl.add benchmarks "rbtree-coarse-grained" (module Rbtree.CoarseGrained);
+  Hashtbl.add benchmarks "rbtree-batched" (module Rbtree.Batched);
+  Hashtbl.add benchmarks "rbtree-explicitly-batched" (module Rbtree.ExplicitlyBatched);
+
+  Hashtbl.add benchmarks "avltree-sequential" (module Avltree.Sequential);
+  Hashtbl.add benchmarks "avltree-coarse-grained" (module Avltree.CoarseGrained);
+  Hashtbl.add benchmarks "avltree-batched" (module Avltree.Batched);
+  Hashtbl.add benchmarks "avltree-explicitly-batched" (module Avltree.ExplicitlyBatched);
+
+  Hashtbl.add benchmarks "treap-sequential" (module Treap.Sequential);
+  Hashtbl.add benchmarks "treap-coarse-grained" (module Treap.CoarseGrained);
+  Hashtbl.add benchmarks "treap-batched" (module Treap.Batched);
+  Hashtbl.add benchmarks "treap-explicitly-batched" (module Treap.ExplicitlyBatched);
+
+  Hashtbl.add benchmarks "vebtree-sequential" (module Vebtree.Sequential);
+  Hashtbl.add benchmarks "vebtree-coarse-grained" (module Vebtree.CoarseGrained);
+  Hashtbl.add benchmarks "vebtree-batched" (module Vebtree.Batched);
+
+  Hashtbl.add benchmarks "xfast-sequential" (module Xfast.Sequential);
+  Hashtbl.add benchmarks "xfast-coarse-grained" (module Xfast.CoarseGrained);
+  Hashtbl.add benchmarks "xfast-batched" (module Xfast.Batched);
+
+  Hashtbl.add benchmarks "yfast-sequential" (module Yfast.Sequential);
+  Hashtbl.add benchmarks "yfast-coarse-grained" (module Yfast.CoarseGrained);
+  Hashtbl.add benchmarks "yfast-batched" (module Yfast.Batched)
 
 
 
