@@ -26,6 +26,34 @@ Build:
 dune build
 ```
 
+## Running tests and benchmarks
+
+<!-- Provided tests can be simply run after building with:
+
+```
+dune runtest
+``` -->
+
+For benchmarking, navigate to the `benchmarks/` directory and use `make` commands:
+
+```
+cd benchmarks
+make avltree-batched
+```
+
+The result of the benchmarks will be printed in `stdout`. See the Makefile therefor the full list of benchmarks that can be run this way.
+
+A more advisable way to run the benchmarks would be to use the provided Jupyter Notebook in `benchmarks/paper-bench.ipynb`. To use it, grab the latest release of Anaconda [here](https://www.anaconda.com/).
+
+Otherwise, if you wish, you set up a Python virtual environment and run the Jupyter Notebook that way:
+
+```
+cd benchmarks
+python3 -m venv venv
+source ./venv/bin/activate
+pip install -r requirements.txt
+```
+
 <!-- Note: For the jupyter notebook, you will need `ipympl` installed.
 
 This fork introduces support for a technique called "batching" which aims to increase data structure throughput of programs. In programs that run with "batching" support, data structure operations can be processed as a logical "batch" instead of atomic operations which reduces synchronization overhead and opens up more opportunities for optimisation. The goal of this work is to provide the scheduling infrastructure for the community to innovate and build new data structures for OCaml that stand to benefit from batching.
